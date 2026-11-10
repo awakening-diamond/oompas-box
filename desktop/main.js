@@ -251,7 +251,7 @@ function createWindow() {
     icon: path.join(__dirname, 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true, backgroundThrottling: false },
   });
-  win.webContents.on('did-frame-finish-load', (e, isMain) => { if (!isMain && ytClean) styleYouTubeFrames(); });
+  win.webContents.on('did-frame-finish-load', (e, isMain) => { if (!isMain && ytClean) { styleYouTubeFrames(); setTimeout(styleYouTubeFrames, 1500); } });
   win.webContents.on('render-process-gone', (e, d) => log(`Window process stopped: ${d.reason} (${d.exitCode})`));
   win.on('unresponsive', () => log('Window stopped responding'));
   win.on('responsive', () => log('Window responding again'));
@@ -339,11 +339,33 @@ const YT_CLEAN_CSS = [
 ].join(',') + ' { display: none !important; opacity: 0 !important; }';
 function styleYouTubeFrames() {
   if (!win || win.isDestroyed()) return;
-  const js = `(() => { let s = document.getElementById('oompas-clean');
-    if (${ytClean}) { if (!s) { s = document.createElement('style'); s.id = 'oompas-clean'; (document.head || document.documentElement).appendChild(s); } s.textContent = ${JSON.stringify(YT_CLEAN_CSS)}; }
-    else if (s) s.remove(); })()`;
+  // YouTube's page only allows its own styles (a content security policy), so a plain <style> is
+  // ignored there. Use a constructed style sheet, a <style> carrying the page's own nonce, and as a
+  // last resort hide matching elements directly as they appear.
+  const js = `(() => {
+    const on = ${ytClean}, css = ${JSON.stringify(YT_CLEAN_CSS)}, sel = css.slice(0, css.indexOf(' {'));
+    try {
+      window.__oompasSheet ||= new CSSStyleSheet();
+      window.__oompasSheet.replaceSync(on ? css : '');
+      if (!document.adoptedStyleSheets.includes(window.__oompasSheet)) document.adoptedStyleSheets = [...document.adoptedStyleSheets, window.__oompasSheet];
+    } catch {}
+    try {
+      let s = document.getElementById('oompas-clean');
+      if (on) {
+        if (!s) { s = document.createElement('style'); s.id = 'oompas-clean'; const n = document.querySelector('[nonce]'); if (n) s.nonce = n.nonce || n.getAttribute('nonce'); (document.head || document.documentElement).appendChild(s); }
+        s.textContent = css;
+      } else if (s) s.remove();
+    } catch {}
+    const hide = () => { for (const el of document.querySelectorAll(sel)) if (!el.dataset.oompasHidden) { el.dataset.oompasHidden = el.style.display || '-'; el.style.setProperty('display', 'none', 'important'); } };
+    const show = () => { for (const el of document.querySelectorAll('[data-oompas-hidden]')) { const d = el.dataset.oompasHidden; el.style.removeProperty('display'); if (d !== '-') el.style.display = d; delete el.dataset.oompasHidden; } };
+    window.__oompasObs?.disconnect(); window.__oompasObs = null;
+    if (on) { hide(); window.__oompasObs = new MutationObserver(hide); window.__oompasObs.observe(document.documentElement, { childList: true, subtree: true }); }
+    else show();
+    return 'ok';
+  })()`;
   for (const f of win.webContents.mainFrame.framesInSubtree)
-    if (/^https:\/\/www\.youtube(-nocookie)?\.com\/embed\//.test(f.url)) f.executeJavaScript(js).catch(() => {});
+    if (/^https:\/\/www\.youtube(-nocookie)?\.com\/embed\//.test(f.url))
+      f.executeJavaScript(js).catch(e => log('YouTube extras: ' + e.message));
 }
 ipcMain.on('yt-clean', (e, on) => { ytClean = !!on; styleYouTubeFrames(); });
 

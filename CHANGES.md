@@ -1,3 +1,8 @@
+## OOMPAS Box 1.4.1
+
+- Fix: "Hide YouTube's on-screen extras" didn't work: YouTube's page refuses styles it didn't add itself. The app now uses
+  methods that page allows.
+
 ## OOMPAS Box 1.4.0
 
 - New setting: Settings → YouTube → **Hide YouTube's on-screen extras**: hides the title bar, YouTube logo, end-screen
