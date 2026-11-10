@@ -33,7 +33,7 @@ for (const handle of handles) {
     const j = await api('playlistItems', { part: 'contentDetails', playlistId: list, maxResults: 50, ...(page ? { pageToken: page } : {}) });
     ids.push(...j.items.map(i => i.contentDetails.videoId));
     page = j.nextPageToken || '';
-  } while (page && ids.length < 5000);
+  } while (page && ids.length < 20000);
   const videos = [];
   for (let i = 0; i < ids.length; i += 50) {
     const j = await api('videos', { part: 'contentDetails,snippet,status', id: ids.slice(i, i + 50).join(',') });
