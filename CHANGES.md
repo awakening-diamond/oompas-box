@@ -1,3 +1,7 @@
+## OOMPAS Box 1.3.4 (engine update)
+
+- Safety net for 1.3.3's list reading in case YouTube's player doesn't say which video it's on.
+
 ## OOMPAS Box 1.3.3 (engine update)
 
 - Fix: YouTube channels could play a different video than the guide said, and loop it. Reading a playlist sometimes took a

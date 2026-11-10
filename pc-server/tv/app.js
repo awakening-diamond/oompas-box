@@ -323,7 +323,8 @@ async function scanList(job) {
       p.cueVideoById(id);
       // The player keeps answering about the previous video for a moment, so only read the length
       // and title once it says it's on this one.
-      const on = () => p.getVideoData?.()?.video_id === id;
+      const cuedAt = Date.now();
+      const on = () => { const vd = p.getVideoData?.() || {}; return vd.video_id ? vd.video_id === id : Date.now() - cuedAt > 1500; };
       const read = () => (on() ? p.getDuration() || 0 : 0);
       let dur = 0;
       for (let i = 0; i < 20 && !dur && err == null; i++) { await sleep(150); dur = read(); }
