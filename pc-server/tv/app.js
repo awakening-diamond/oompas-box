@@ -530,6 +530,8 @@ function browseCats() {
   add('spelunkr', 'Spelunkr', c => c.kind === 'spelunkr');
   const iptv = ch.filter(c => c.kind === 'iptv');
   if (iptv.length) {
+    const lists = [...new Set(iptv.map(c => c.section))];
+    for (const name of lists) add('list:' + name, `\u25B8 ${name}`, c => c.kind === 'iptv' && c.section === name);
     add('iptv', 'IPTV \u00B7 all', c => c.kind === 'iptv');
     const cats = new Map();
     for (const c of iptv) for (const k of (c.cats?.length ? c.cats : ['Other'])) cats.set(k, (cats.get(k) || 0) + 1);
@@ -694,6 +696,9 @@ function pageRows() {
     R.push({ type: 'toggle', label: 'CRT look', sub: 'Scanlines and a softer picture in this app', get: () => st.crt !== false, set: v => { st.crt = v; screen.classList.toggle('crt', v); saveSetting({ crt: v }); } });
     R.push({ type: 'toggle', label: 'Channel banner', sub: 'Show what’s on when you change channel', get: () => st.banner !== false, set: v => { st.banner = v; saveSetting({ banner: v }); } });
     sec('Channels');
+    R.push({ type: 'choice', label: 'OOMPAS Box channels', sub: 'The Internet Archive channels, and the Guide & Weather channels. Spelunkr\u2019s channels always stay', values: ['off', 'guide', 'all'],
+             names: { off: 'Off', guide: 'Guide & Weather', all: 'All' }, get: () => st.oompas || 'off',
+             set: v => { st.oompas = v; saveSetting({ oompas: v }, true).then(() => loadChannels()).then(() => renderSettings()).catch(() => {}); } });
     R.push({ type: 'btn', label: 'Channel list\u2026', sub: 'Browse by category, country or My channels (or press C)', val: '\u25B8', act: () => { closeSettings(); openBrowse(); } });
     R.push({ type: 'choice', label: 'Channel up/down goes through', sub: 'Star channels with a long press on OK (or *)', values: ['all', 'favorites'],
              names: { all: 'All channels', favorites: 'My channels' }, get: () => st.surf || 'all', set: v => { st.surf = v; saveSetting({ surf: v }); } });

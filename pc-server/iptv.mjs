@@ -5,6 +5,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import crypto from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+
+const LINEUPS = path.join(path.dirname(fileURLToPath(import.meta.url)), 'lineups');
 
 // Free channel lists offered in Settings. iptv-org (github.com/iptv-org/iptv) collects
 // publicly available, free-to-air streams. Its adult category is not offered.
@@ -12,6 +15,8 @@ const IO = 'https://iptv-org.github.io/iptv';
 // iptv-org's playlist grouped by language: tells which language each stream is in.
 const LANG_INDEX = process.env.IPTV_LANG_INDEX || `${IO}/index.language.m3u`;
 export const CATALOG = [
+  // Hand-picked lineups that ship with OOMPAS Box (pc-server/lineups/*.json).
+  { id: 'oompas-2000s-cable', group: 'OOMPAS picks', name: '2000s Cable (100 channels)', url: 'curated:2000s-cable' },
   ...[['classic', 'Classic TV'], ['animation', 'Animation'], ['movies', 'Movies'], ['series', 'Series'],
       ['comedy', 'Comedy'], ['kids', 'Kids'], ['family', 'Family'], ['documentary', 'Documentary'],
       ['science', 'Science'], ['music', 'Music'], ['news', 'News'], ['weather', 'Weather'],
@@ -25,6 +30,8 @@ export const CATALOG = [
     .map(([k, n]) => ({ id: 'iptvorg-' + k, group: 'By country', name: n, url: `${IO}/countries/${k}.m3u` })),
 ];
 
+// Networks that iptv-org lists as English but that broadcast in another language.
+const NOT_ENGLISH = /telemundo|univision|unimas|\blatino\b|latinx|espa[nñ]ol|deportes|telenovela|azteca|estrella tv|mega tv|extrema|\bcine\b|tbn (ukraine|armenia)|omid|payvand|mtv flow|vevo latino/i;
 const ADULT = /\b(xxx|adult|porn|erotic|playboy|hustler|brazzers|18\+|hentai|sexy)\b/i;
 const RAINBOW = ['#ff5a5a', '#ffa64d', '#ffd84a', '#5ad27a', '#4fb0ff', '#a07bff', '#ff7bd0'];
 const sha = s => crypto.createHash('sha1').update(String(s)).digest('hex').slice(0, 12);
@@ -144,6 +151,7 @@ export class Iptv {
         if (!force && have && !have.error && Date.now() - have.at < 6 * 3600e3 && have.url === l.url) continue;
         const cacheFile = path.join(this.dir, sha(l.url) + '.m3u');
         try {
+          if (/^curated:/.test(l.url)) { await this.loadCurated(l, force); this.rebuild(); continue; }
           let text;
           try { text = await this.get(l.url); fs.writeFileSync(cacheFile, text); }
           catch (e) { if (fs.existsSync(cacheFile)) { text = fs.readFileSync(cacheFile, 'utf8'); this.log(`IPTV: ${l.name}: ${e.message}, using the saved copy`); } else throw e; }
@@ -176,6 +184,30 @@ export class Iptv {
       }
     })().finally(() => { this.busy = null; });
     return this.busy;
+  }
+
+  // A hand-picked lineup: fixed channel numbers, stream links looked up fresh in its source list
+  // (matched by iptv-org channel id, official free sources first), with the saved link as a fallback.
+  async loadCurated(l, force) {
+    const def = JSON.parse(fs.readFileSync(path.join(LINEUPS, l.url.slice(8).replace(/[^\w-]/g, '') + '.json'), 'utf8'));
+    const cacheFile = path.join(this.dir, sha(def.source) + '.m3u');
+    let src = [];
+    try {
+      let text;
+      const fresh = fs.existsSync(cacheFile) && Date.now() - fs.statSync(cacheFile).mtimeMs < 6 * 3600e3;
+      if (fresh && !force) text = fs.readFileSync(cacheFile, 'utf8');
+      else { try { text = await this.get(def.source); fs.writeFileSync(cacheFile, text); } catch (e) { if (fs.existsSync(cacheFile)) text = fs.readFileSync(cacheFile, 'utf8'); else throw e; } }
+      src = parseM3U(text).channels;
+    } catch (e) { this.log(`IPTV: ${def.name}: couldn't refresh links (${e.message}), using the saved ones`); }
+    const officialHost = u => { try { const h = new URL(u).hostname; return !/^\d+\.\d+\.\d+\.\d+$/.test(h) && !/aynascope|aynaott|cammonitor|keralive|workers\.dev|bozztv|livestreamcdn|tvsen/.test(u); } catch { return false; } };
+    const channels = def.channels.map(c => {
+      const cands = src.filter(x => x.tvgId === c.id && officialHost(x.url));
+      const hit = cands.find(x => x.name.startsWith(c.match)) || cands[0];
+      return { name: c.name, tvgId: c.id, tvgName: hit?.tvgName || c.match, logo: hit?.logo || c.logo, group: c.group,
+               url: hit?.url || c.url, ua: hit?.ua || '', referrer: hit?.referrer || '', chno: c.dial, curated: true };
+    });
+    this.lists.set(l.id, { url: l.url, channels, epgUrl: l.epg || '', at: Date.now(), error: null, curated: true });
+    this.log(`IPTV: ${def.name}: ${channels.length} channels`);
   }
 
   // Language of each iptv-org stream (their playlists don't say it per channel).
@@ -273,12 +305,28 @@ export class Iptv {
       const want = new Set((this.settings.countries || []).map(x => String(x).toLowerCase()));
       const wantCats = new Set((this.settings.categories || []).map(x => String(x).toLowerCase()));
       const wantLangs = new Set((this.settings.languages || []).map(x => String(x).toLowerCase()));
-      for (const l of this.settings.lists.filter(l => l.enabled !== false)) {
+      const lists = this.settings.lists.filter(l => l.enabled !== false)
+        .sort((a, b) => (/^curated:/.test(b.url) ? 1 : 0) - (/^curated:/.test(a.url) ? 1 : 0));
+      const taken = new Set();
+      for (const l of lists) {
         const data = this.lists.get(l.id);
         if (!data) continue;
         for (const c of data.channels) {
           if (!c.url || seen.has(c.url)) continue;
           if (this.settings.hideAdult !== false && (ADULT.test(c.group) || ADULT.test(c.name))) continue;
+          if (c.curated) {
+            const health = this.health.get(c.url);
+            if (this.settings.hideBroken && health && !health.ok && Date.now() - health.at < 3 * 86400e3) continue;
+            seen.add(c.url);
+            const d = taken.has(c.chno) ? null : c.chno;
+            if (d == null) continue;
+            taken.add(d);
+            out.push({ dial: d, id: 'iptv-' + sha(l.id + '|' + c.tvgId), name: c.name, tags: [], call: callOf(c.name), color: RAINBOW[d % RAINBOW.length],
+                       langs: ['English'], health: health ? (health.ok ? 'ok' : 'bad') : '', healthWhy: health?.why || '',
+                       kind: 'iptv', logo: c.logo, group: c.group, list: data.curated ? (l.name.replace(/\s*\(.*\)$/, '')) : l.name, listId: l.id, country: 'us',
+                       cats: [c.group], epgUrl: data.epgUrl, tvgId: c.tvgId, tvgName: c.tvgName, iptv: { url: c.url, ua: c.ua, referrer: c.referrer } });
+            continue;
+          }
           const country = countryOf(c);
           counts[country || '?'] = (counts[country || '?'] || 0) + 1;
           // Countries filter (empty = all). Channels with no country only show with "all".
@@ -288,6 +336,7 @@ export class Iptv {
           const lk = langs.length ? langs : ['Unknown'];
           for (const k of lk) langCounts[k] = (langCounts[k] || 0) + 1;
           if (wantLangs.size && !lk.some(k => wantLangs.has(k.toLowerCase()))) continue;
+          if (wantLangs.has('english') && wantLangs.size === 1 && NOT_ENGLISH.test(c.name)) continue;
           // Categories filter (empty = all): a channel shows if it's in any chosen category.
           const cats = catsOf(c);
           for (const k of cats) catCounts[k] = (catCounts[k] || 0) + 1;
@@ -295,6 +344,8 @@ export class Iptv {
           const health = this.health.get(c.url);
           if (this.settings.hideBroken && health && !health.ok && Date.now() - health.at < 3 * 86400e3) continue;
           seen.add(c.url);
+          while (taken.has(dial)) dial++;
+          taken.add(dial);
           const id = 'iptv-' + sha(l.id + '|' + c.url);
           const { name, tags } = cleanName(c.name);
           out.push({ dial: dial, id, name, tags, call: callOf(name), color: RAINBOW[dial % RAINBOW.length], langs,

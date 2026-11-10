@@ -1,0 +1,908 @@
+{
+ "name": "2000s Cable",
+ "description": "100 national channels picked from iptv-org's free US list to feel like a 2000s cable lineup. Official free sources only (Pluto TV, Samsung TV Plus, Xumo, Tubi, Roku and the networks' own feeds); no local stations.",
+ "source": "https://iptv-org.github.io/iptv/countries/us.m3u",
+ "updated": "2026-11-10",
+ "channels": [
+  {
+   "dial": 100,
+   "name": "CBS News 24/7",
+   "match": "CBS News 24/7",
+   "id": "CBSNews247.us@SD",
+   "url": "https://jmp2.uk/plu-6350fdd266e9ea0007bedec5.m3u8",
+   "group": "News & Weather",
+   "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/CBS_News_247_logo.svg/960px-CBS_News_247_logo.svg.png"
+  },
+  {
+   "dial": 101,
+   "name": "ABC News Live 1",
+   "match": "ABC News Live 1",
+   "id": "ABCNewsLive1.us@SD",
+   "url": "https://abcnews-streams.akamaized.net/hls/live/2023560/abcnewshudson1/master.m3u8",
+   "group": "News & Weather",
+   "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/63/ABC_News_Live_logo_2021.svg/960px-ABC_News_Live_logo_2021.svg.png"
+  },
+  {
+   "dial": 102,
+   "name": "NBC News NOW",
+   "match": "NBC News NOW",
+   "id": "NBCNewsNOW.us@SD",
+   "url": "https://d1si3n1st4nkgb.cloudfront.net/10502/88896001/hls/master.m3u8?ads.xumo_channelId=88896001",
+   "group": "News & Weather",
+   "logo": "https://i.imgur.com/JZt2qh5.png"
+  },
+  {
+   "dial": 103,
+   "name": "LiveNOW from FOX",
+   "match": "LiveNOW from FOX",
+   "id": "LiveNOWfromFOX.us@SD",
+   "url": "https://fox-foxnewsnow-vizio.amagi.tv/playlist.m3u8",
+   "group": "News & Weather",
+   "logo": "https://i.imgur.com/1JnyzHv.png"
+  },
+  {
+   "dial": 104,
+   "name": "Scripps News",
+   "match": "Scripps News",
+   "id": "ScrippsNews.us@SD",
+   "url": "https://aegis-cloudfront-1.tubi.video/7e1c26b7-7975-4240-9a4f-480eaa8f3ea4/playlist.m3u8",
+   "group": "News & Weather",
+   "logo": "https://i.imgur.com/W0Jvi5o.png"
+  },
+  {
+   "dial": 105,
+   "name": "Reuters TV",
+   "match": "Reuters TV",
+   "id": "ReutersTV.us@SD",
+   "url": "https://amg00453-reuters-amg00453c1-rakuten-uk-2110.playouts.now.amagi.tv/playlist/amg00453-reuters-reuters-rakutenuk/playlist.m3u8",
+   "group": "News & Weather",
+   "logo": "https://i.imgur.com/6eQ2nCJ.png"
+  },
+  {
+   "dial": 106,
+   "name": "CNN Originals",
+   "match": "CNN Originals",
+   "id": "CNNOriginals.us@SD",
+   "url": "https://amg01918-cnnus-amg01918c2-vizio-us-9192.playouts.now.amagi.tv/playlist/amg01918-cnnus-cnnoriginals-vizious/playlist.m3u8",
+   "group": "News & Weather",
+   "logo": "https://provider-static.plex.tv/epg/cms/production/f351d697-1e1f-4e7d-86c7-5995698e593f/CNN_Originals_ChannelLogo_Dark_1500x1000_2025_-_Grace_Hartwig.png"
+  },
+  {
+   "dial": 107,
+   "name": "Court TV",
+   "match": "Court TV",
+   "id": "CourtTV.us@SD",
+   "url": "https://cdn-uw2-prod.tsv2.amagi.tv/linear/amg01438-ewscrippscompan-courttv-tablo/playlist.m3u8",
+   "group": "News & Weather",
+   "logo": "https://i.imgur.com/jOKA735.png"
+  },
+  {
+   "dial": 108,
+   "name": "The Weather Channel",
+   "match": "The Weather Channel",
+   "id": "TheWeatherChannel.us@SD",
+   "url": "https://twcprod-live.twc-tv.com/v1/manifest/b4d4d63a49309cc5140171fb2e92485c31be1e9e/DSP_6228e4760505741a116f1ba2_twcprod-live/6bf09ce5-366b-463c-b67e-c4b799f73c3f/4.m3u8",
+   "group": "News & Weather",
+   "logo": "https://i.imgur.com/PIaNjfa.png"
+  },
+  {
+   "dial": 109,
+   "name": "WeatherNation",
+   "match": "WeatherNation",
+   "id": "WeatherNation.us@SD",
+   "url": "https://d2ferbiwcx1539.cloudfront.net/v1/master/3722c60a815c199d9c0ef36c5b73da68a62b09d1/cc-8zd06wicndthf-ssai-prd/WNNationalSamsung/WNNationalSamsung.m3u8",
+   "group": "News & Weather",
+   "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/de/WeatherNation_Logo.svg/960px-WeatherNation_Logo.svg.png"
+  },
+  {
+   "dial": 110,
+   "name": "NFL Channel",
+   "match": "NFL Channel",
+   "id": "NFLChannel.us@SD",
+   "url": "https://jmp2.uk/plu-5ced7d5df64be98e07ed47b6.m3u8",
+   "group": "Sports",
+   "logo": "https://i.imgur.com/mPGtwAP.png"
+  },
+  {
+   "dial": 111,
+   "name": "MLB",
+   "match": "MLB",
+   "id": "MLB.us@SD",
+   "url": "https://jmp2.uk/plu-5e66968a70f34c0007d050be.m3u8",
+   "group": "Sports",
+   "logo": "https://i.imgur.com/ym3su2J.png"
+  },
+  {
+   "dial": 112,
+   "name": "NHL Network",
+   "match": "NHL Network",
+   "id": "NHLNetwork.us@SD",
+   "url": "https://nhl-firetv.amagi.tv/playlist.m3u8",
+   "group": "Sports",
+   "logo": "https://i.imgur.com/UNZ8bef.png"
+  },
+  {
+   "dial": 113,
+   "name": "CBS Sports HQ",
+   "match": "CBS Sports HQ",
+   "id": "CBSSportsHQ.us@SD",
+   "url": "https://jmp2.uk/plu-5e9f2c05172a0f0007db4786.m3u8",
+   "group": "Sports",
+   "logo": "https://i.imgur.com/q8BENJg.png"
+  },
+  {
+   "dial": 114,
+   "name": "Stadium",
+   "match": "Stadium",
+   "id": "Stadium.us@SD",
+   "url": "https://wurl120sports.global.transmit.live/hls/679a907dce42a042c23ace37/v1/stadium_gracenote/samsung_us/latest/main/hls/playlist.m3u8",
+   "group": "Sports",
+   "logo": "https://upload.wikimedia.org/wikipedia/en/thumb/5/53/Stadium_%28sports_network%29_logo.svg/960px-Stadium_%28sports_network%29_logo.svg.png"
+  },
+  {
+   "dial": 115,
+   "name": "Tennis Channel",
+   "match": "Tennis Channel",
+   "id": "TennisChannel.us@SD",
+   "url": "https://cdn-ue1-prod.tsv2.amagi.tv/linear/amg01444-tennischannelth-tennischannelnl-samsungnl/playlist.m3u8",
+   "group": "Sports",
+   "logo": "https://i.imgur.com/tsljAnY.png"
+  },
+  {
+   "dial": 116,
+   "name": "PGA Tour",
+   "match": "PGA Tour",
+   "id": "PGATour.us@SD",
+   "url": "https://d11k1mnrgfposz.cloudfront.net/playlist.m3u8",
+   "group": "Sports",
+   "logo": "https://i.imgur.com/J0TY9dG.png"
+  },
+  {
+   "dial": 117,
+   "name": "World Poker Tour",
+   "match": "World Poker Tour",
+   "id": "WorldPokerTour.us@US",
+   "url": "https://d2e00kr7m9coe4.cloudfront.net/scheduler/scheduleMaster/406.m3u8",
+   "group": "Sports",
+   "logo": "https://i.imgur.com/98kLMjj.png"
+  },
+  {
+   "dial": 118,
+   "name": "MTV Pluto TV",
+   "match": "MTV Pluto TV",
+   "id": "MTVPlutoTV.us@US",
+   "url": "https://jmp2.uk/plu-5ca672f515a62078d2ec0ad2.m3u8",
+   "group": "Music",
+   "logo": "https://images.pluto.tv/channels/5f1212fb81e85c00077ae9ef/colorLogoPNG_1759263027326.png"
+  },
+  {
+   "dial": 119,
+   "name": "Yo! MTV",
+   "match": "Yo! MTV",
+   "id": "YoMTV.us@SD",
+   "url": "https://jmp2.uk/plu-5d14fc31252d35decbc4080b.m3u8",
+   "group": "Music",
+   "logo": "https://images.pluto.tv/channels/654102ed770cf1000866c307/colorLogoPNG.png"
+  },
+  {
+   "dial": 120,
+   "name": "BET Pluto TV",
+   "match": "BET Pluto TV",
+   "id": "BETPlutoTV.us@US",
+   "url": "https://jmp2.uk/plu-5ca670f6593a5d78f0e85aed.m3u8",
+   "group": "Music",
+   "logo": "https://images.pluto.tv/channels/5ff768b6a4c8b80008498610/colorLogoPNG_1756804608228.png"
+  },
+  {
+   "dial": 121,
+   "name": "Vevo 2K",
+   "match": "Vevo 2K",
+   "id": "Vevo2K.us@SD",
+   "url": "https://d1s6jz7jeei17.cloudfront.net/playlist/amg00056-vevotv-vevo2kau-samsungau/playlist.m3u8",
+   "group": "Music",
+   "logo": "https://images.pluto.tv/channels/5fd7bca3e0a4ee0007a38e8c/featuredImage.jpg"
+  },
+  {
+   "dial": 122,
+   "name": "Vevo '90s",
+   "match": "Vevo '90s",
+   "id": "Vevo90s.us@SD",
+   "url": "https://amg00056-vevotv-vevo90saunz-samsungau-n6a0d.amagi.tv/playlist/amg00056-vevotv-vevo90saunz-samsungau/playlist.m3u8",
+   "group": "Music",
+   "logo": "https://images.pluto.tv/channels/5fd7bb1f86d94a000796e2c2/featuredImage.jpg"
+  },
+  {
+   "dial": 123,
+   "name": "Nickelodeon Pluto TV",
+   "match": "Nickelodeon Pluto TV",
+   "id": "NickelodeonPlutoTV.us@SD",
+   "url": "https://jmp2.uk/plu-5ca673e0d0bd6c2689c94ce3.m3u8",
+   "group": "Kids & Cartoons",
+   "logo": "https://images.pluto.tv/channels/5ca673e0d0bd6c2689c94ce3/colorLogoPNG.png"
+  },
+  {
+   "dial": 124,
+   "name": "Nick Jr. Pluto TV",
+   "match": "Nick Jr. Pluto TV",
+   "id": "NickJrPlutoTV.us@US",
+   "url": "https://jmp2.uk/plu-5ca6748a37b88b269472dad9.m3u8",
+   "group": "Kids & Cartoons",
+   "logo": "https://images.pluto.tv/channels/62bdb75c3afd1200079146a6/colorLogoPNG.png"
+  },
+  {
+   "dial": 125,
+   "name": "PBS Kids",
+   "match": "PBS Kids",
+   "id": "PBSKids.us@SD",
+   "url": "https://livestream.pbskids.org/out/v1/14507d931bbe48a69287e4850e53443c/est.m3u8",
+   "group": "Kids & Cartoons",
+   "logo": "https://i.imgur.com/fg8c9WK.png"
+  },
+  {
+   "dial": 126,
+   "name": "Toonami Aftermath",
+   "match": "Toonami Aftermath",
+   "id": "ToonamiAftermath.us@East",
+   "url": "http://api.toonamiaftermath.com:3000/est/playlist.m3u8",
+   "group": "Kids & Cartoons",
+   "logo": "https://i.imgur.com/aSjhZK7.png"
+  },
+  {
+   "dial": 127,
+   "name": "MeTV Toons",
+   "match": "MeTV Toons",
+   "id": "MeTVToons.us@SD",
+   "url": "https://sr-live-weigel1.akamaized.net/out/v1/0d1dbf29e64e47bc991796cc24fbeb97/index_2.m3u8",
+   "group": "Kids & Cartoons",
+   "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2b/MeTV_Toons.png/250px-MeTV_Toons.png"
+  },
+  {
+   "dial": 128,
+   "name": "Naruto",
+   "match": "Naruto",
+   "id": "Naruto.us@US",
+   "url": "https://d21vn5eki5qsdi.cloudfront.net/playlist.m3u8",
+   "group": "Kids & Cartoons",
+   "logo": "https://i.imgur.com/M8X3Kvc.png"
+  },
+  {
+   "dial": 129,
+   "name": "90's Kids",
+   "match": "90's Kids",
+   "id": "90sKids.us@SD",
+   "url": "https://jmp2.uk/plu-6452c814939a590008567a3b.m3u8",
+   "group": "Kids & Cartoons",
+   "logo": "https://images.pluto.tv/channels/6452c814939a590008567a3b/colorLogoPNG_1731836283044.png"
+  },
+  {
+   "dial": 130,
+   "name": "Garfield and Friends",
+   "match": "Garfield and Friends",
+   "id": "GarfieldandFriends.us@US",
+   "url": "https://jmp2.uk/plu-677f927554f43dad4b3258aa.m3u8",
+   "group": "Kids & Cartoons",
+   "logo": "https://i.imgur.com/evzfe9C.png"
+  },
+  {
+   "dial": 131,
+   "name": "Totally Turtles",
+   "match": "Totally Turtles (United States)",
+   "id": "TotallyTurtles.us@US",
+   "url": "https://jmp2.uk/plu-5d0c16d686454ead733d08f8.m3u8",
+   "group": "Kids & Cartoons",
+   "logo": "https://images.pluto.tv/channels/62e95265c9fd030007268fb9/colorLogoPNG.png"
+  },
+  {
+   "dial": 132,
+   "name": "Comedy Central Pluto TV",
+   "match": "Comedy Central Pluto TV",
+   "id": "ComedyCentralPlutoTV.us@US",
+   "url": "https://jmp2.uk/plu-5ca671f215a62078d2ec0abf.m3u8",
+   "group": "Comedy",
+   "logo": "https://images.pluto.tv/channels/5f357e91b18f0b00073583d2/colorLogoPNG.png"
+  },
+  {
+   "dial": 133,
+   "name": "SNL Vault",
+   "match": "SNL Vault",
+   "id": "SNLVault.us@SD",
+   "url": "https://d4whmvwm0rdvi.cloudfront.net/10007/99993017/hls/master.m3u8?ads.xumo_channelId=99993017",
+   "group": "Comedy",
+   "logo": "https://provider-static.plex.tv/epg/cms/production/712dae9e-9111-4bbc-8ea4-242e891ab5b3/snl-vault-fclogo-72-dpi-1500-x-1000-3-2-channel-logo-dark-plex-1.png"
+  },
+  {
+   "dial": 134,
+   "name": "AFV",
+   "match": "AFV",
+   "id": "AFV.us@SD",
+   "url": "https://linear-12.frequency.stream/dist/plex/12/hls/master/playlist.m3u8",
+   "group": "Comedy",
+   "logo": "https://i.imgur.com/TOB9vmW.png"
+  },
+  {
+   "dial": 135,
+   "name": "Tosh.0",
+   "match": "Tosh.0 (United States)",
+   "id": "Tosh0.us@SD",
+   "url": "https://jmp2.uk/plu-5dae084727c8af0009fe40a4.m3u8",
+   "group": "Comedy",
+   "logo": "https://i.imgur.com/sXkluxg.png"
+  },
+  {
+   "dial": 136,
+   "name": "TV Land Sitcoms",
+   "match": "TV Land Sitcoms",
+   "id": "TVLandSitcoms.us@SD",
+   "url": "https://jmp2.uk/plu-5c2d64ffbdf11b71587184b8.m3u8",
+   "group": "Comedy",
+   "logo": "https://i.imgur.com/phHHs7l.png"
+  },
+  {
+   "dial": 137,
+   "name": "Three's Company",
+   "match": "Three's Company",
+   "id": "ThreesCompany.us@SD",
+   "url": "https://jmp2.uk/plu-5ef3977e5d773400077de284.m3u8",
+   "group": "Comedy",
+   "logo": "https://images.pluto.tv/channels/64ca723a2bc49300081a8966/colorLogoPNG.png"
+  },
+  {
+   "dial": 138,
+   "name": "Cheers + Frasier",
+   "match": "Cheers + Frasier",
+   "id": "CheersPlusFrasier.us@SD",
+   "url": "https://jmp2.uk/plu-66ba495ffe11e5000881f049.m3u8",
+   "group": "Comedy",
+   "logo": "https://images.pluto.tv/channels/66ba495ffe11e5000881f049/colorLogoPNG.png"
+  },
+  {
+   "dial": 139,
+   "name": "Family Ties",
+   "match": "Family Ties (United States)",
+   "id": "FamilyTies.us@SD",
+   "url": "https://jmp2.uk/plu-5f77939a630f530007dde654.m3u8",
+   "group": "Comedy",
+   "logo": "https://i.imgur.com/WJEkKCb.png"
+  },
+  {
+   "dial": 140,
+   "name": "Happy Days",
+   "match": "Happy Days (United States)",
+   "id": "HappyDays.us@SD",
+   "url": "https://jmp2.uk/plu-5f7794162a4559000781fc12.m3u8",
+   "group": "Comedy",
+   "logo": "https://images.pluto.tv/channels/62e917b5e354cf0007b97a67/colorLogoPNG.png"
+  },
+  {
+   "dial": 141,
+   "name": "Mystery Science Theater 3000",
+   "match": "Mystery Science Theater 3000",
+   "id": "MysteryScienceTheater3000.us@SD",
+   "url": "https://d1c73nj8qxp55a.cloudfront.net/Mystery_Science_Theater_3000.m3u8",
+   "group": "Comedy",
+   "logo": "https://i.imgur.com/8KWjY4o.png"
+  },
+  {
+   "dial": 142,
+   "name": "Johnny Carson TV",
+   "match": "Johnny Carson TV",
+   "id": "JohnnyCarsonTV.us@SD",
+   "url": "https://aegis-cloudfront-1.tubi.video/475550ae-8708-46a5-a7c3-54acb3d91480/playlist.m3u8",
+   "group": "Comedy",
+   "logo": "https://i.imgur.com/KBTqpJ7.png"
+  },
+  {
+   "dial": 143,
+   "name": "CSI",
+   "match": "CSI (United States)",
+   "id": "CSI.us@SD",
+   "url": "https://jmp2.uk/plu-5efbd29e4aa26700076c0d06.m3u8",
+   "group": "Drama & Sci-Fi",
+   "logo": "https://i.imgur.com/xLLNEfA.png"
+  },
+  {
+   "dial": 144,
+   "name": "CSI: Miami",
+   "match": "CSI: Miami",
+   "id": "CSIMiami.us@SD",
+   "url": "https://jmp2.uk/plu-62f54c11b3af68000702c304.m3u8",
+   "group": "Drama & Sci-Fi",
+   "logo": "https://images.pluto.tv/channels/63eb9c5351f5d000085e8d7e/colorLogoPNG.png"
+  },
+  {
+   "dial": 145,
+   "name": "Baywatch",
+   "match": "Baywatch",
+   "id": "Baywatch.us@US",
+   "url": "https://amg00145-fremantlemedian-baywatch-samsungau-gtsd6.amagi.tv/playlist/amg00145-fremantlemedian-baywatch-samsungau/playlist.m3u8",
+   "group": "Drama & Sci-Fi",
+   "logo": "https://i.imgur.com/c2esKHg.png"
+  },
+  {
+   "dial": 146,
+   "name": "Beverly Hills 90210",
+   "match": "Beverly Hills 90210",
+   "id": "BeverlyHills90210.us@SD",
+   "url": "https://jmp2.uk/plu-5f4d83e0a382c00007bc02e7.m3u8",
+   "group": "Drama & Sci-Fi",
+   "logo": "https://images.pluto.tv/channels/5f4d83e0a382c00007bc02e7/colorLogoPNG.png"
+  },
+  {
+   "dial": 147,
+   "name": "Matlock",
+   "match": "Matlock (United States)",
+   "id": "Matlock.us@SD",
+   "url": "https://jmp2.uk/plu-60f754f98185580007eb0754.m3u8",
+   "group": "Drama & Sci-Fi",
+   "logo": "https://images.pluto.tv/channels/63da365f60bc8f0008a50f44/colorLogoPNG.png"
+  },
+  {
+   "dial": 148,
+   "name": "Star Trek: The Next Generation",
+   "match": "Star Trek: The Next Generation (United States)",
+   "id": "StarTrekTheNextGeneration.us@SD",
+   "url": "https://jmp2.uk/plu-695c32e61ca20bb8ca802eb9.m3u8",
+   "group": "Drama & Sci-Fi",
+   "logo": "https://images.pluto.tv/channels/695c32e61ca20bb8ca802eb9/colorLogoPNG_1768440087394.png"
+  },
+  {
+   "dial": 149,
+   "name": "Star Trek: Voyager",
+   "match": "Star Trek: Voyager (United States)",
+   "id": "StarTrekVoyager.us@SD",
+   "url": "https://jmp2.uk/plu-634dacf51d90320007fcd5fa.m3u8",
+   "group": "Drama & Sci-Fi",
+   "logo": "https://images.pluto.tv/channels/634dacf51d90320007fcd5fa/colorLogoPNG_1758310287876.png"
+  },
+  {
+   "dial": 150,
+   "name": "Pluto TV The Twilight Zone",
+   "match": "Pluto TV The Twilight Zone",
+   "id": "PlutoTVTheTwilightZone.us@SD",
+   "url": "https://jmp2.uk/plu-67352ed93a61d4000881f9fa.m3u8",
+   "group": "Drama & Sci-Fi",
+   "logo": "https://i.imgur.com/FiIRQAR.png"
+  },
+  {
+   "dial": 151,
+   "name": "Battlestar Galactica",
+   "match": "Battlestar Galactica",
+   "id": "BattlestarGalactica.us@SD",
+   "url": "https://jmp2.uk/plu-69d7ebff029c431826bd328e.m3u8",
+   "group": "Drama & Sci-Fi",
+   "logo": "https://images.pluto.tv/channels/69d7ebff029c431826bd328e/colorLogoPNG_1776982986391.png"
+  },
+  {
+   "dial": 152,
+   "name": "Comet",
+   "match": "Comet",
+   "id": "Comet.us@SD",
+   "url": "https://fast-channels.sinclairstoryline.com/COMET/index.m3u8",
+   "group": "Drama & Sci-Fi",
+   "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/Comet_logo.svg/960px-Comet_logo.svg.png"
+  },
+  {
+   "dial": 153,
+   "name": "Fear Factor",
+   "match": "Fear Factor",
+   "id": "FearFactor.us@US",
+   "url": "https://amg00627-banijaygroup-fearfactor-samsungau-9vdod.amagi.tv/playlist/amg00627-banijaygroup-fearfactor-samsungau/playlist.m3u8",
+   "group": "Reality & Game Shows",
+   "logo": "https://i.imgur.com/CIYnLWz.png"
+  },
+  {
+   "dial": 154,
+   "name": "Deal or No Deal",
+   "match": "Deal or No Deal",
+   "id": "DealorNoDeal.us@SD",
+   "url": "https://amg00627-banijaygroup-dealornodeal-samsungau-si7xg.amagi.tv/playlist/amg00627-banijaygroup-dealornodeal-samsungau/playlist.m3u8",
+   "group": "Reality & Game Shows",
+   "logo": "https://i.imgur.com/lZvNXA1.png"
+  },
+  {
+   "dial": 155,
+   "name": "Survivor",
+   "match": "Survivor",
+   "id": "Survivor.us@SD",
+   "url": "https://amg00627-amg00627c16-samsung-nz-2811.playouts.now.amagi.tv/playlist/amg00627-banijayfast-survivor-samsungnz/playlist.m3u8",
+   "group": "Reality & Game Shows",
+   "logo": "https://i.imgur.com/Zz9SgY8.png"
+  },
+  {
+   "dial": 156,
+   "name": "Big Brother",
+   "match": "Big Brother",
+   "id": "BigBrother.us@SD",
+   "url": "https://jmp2.uk/plu-6661f11a41af6400080e90d8.m3u8",
+   "group": "Reality & Game Shows",
+   "logo": "https://images.pluto.tv/channels/6661f11a41af6400080e90d8/colorLogoPNG.png"
+  },
+  {
+   "dial": 157,
+   "name": "The Amazing Race",
+   "match": "The Amazing Race",
+   "id": "TheAmazingRace.us@SD",
+   "url": "https://jmp2.uk/plu-5f21e8a6e2f12b000755afdb.m3u8",
+   "group": "Reality & Game Shows",
+   "logo": "https://i.imgur.com/5yzPhRo.png"
+  },
+  {
+   "dial": 158,
+   "name": "America's Next Top Model",
+   "match": "America's Next Top Model",
+   "id": "AmericasNextTopModel.us@SD",
+   "url": "https://jmp2.uk/plu-68757c45759366af05b3b199.m3u8",
+   "group": "Reality & Game Shows",
+   "logo": "https://images.pluto.tv/channels/68679fc6bb46d0bdd38ac9a4/colorLogoPNG_1756466390265.png"
+  },
+  {
+   "dial": 159,
+   "name": "Dog the Bounty Hunter",
+   "match": "Dog the Bounty Hunter",
+   "id": "DogtheBountyHunter.us@US",
+   "url": "https://aegis-cloudfront-1.tubi.video/ff0ad399-75ed-42ba-8c60-75bb6cb8c929/playlist.m3u8",
+   "group": "Reality & Game Shows",
+   "logo": "https://i.imgur.com/lMICupK.png"
+  },
+  {
+   "dial": 160,
+   "name": "Pluto TV Storage Wars",
+   "match": "Pluto TV Storage Wars",
+   "id": "PlutoTVStorageWars.us@SD",
+   "url": "https://jmp2.uk/plu-6887aaf4e3703b7d42b71a1e.m3u8",
+   "group": "Reality & Game Shows",
+   "logo": "https://i.imgur.com/mnHRLlg.png"
+  },
+  {
+   "dial": 161,
+   "name": "Jersey Shore",
+   "match": "Jersey Shore (United States)",
+   "id": "JerseyShore.us@SD",
+   "url": "https://jmp2.uk/plu-609bfa51fbecc1000733152e.m3u8",
+   "group": "Reality & Game Shows",
+   "logo": "https://i.imgur.com/SssCaj1.png"
+  },
+  {
+   "dial": 162,
+   "name": "Wipeout Xtra",
+   "match": "Wipeout Xtra",
+   "id": "WipeoutXtra.us@SD",
+   "url": "https://amg00627-banijaygroup-wipeoutxtraau-samsungau-ashbl.amagi.tv/playlist/amg00627-banijaygroup-wipeoutxtraau-samsungau/playlist.m3u8",
+   "group": "Reality & Game Shows",
+   "logo": "https://i.imgur.com/UDeCRW1.png"
+  },
+  {
+   "dial": 163,
+   "name": "The Price Is Right",
+   "match": "The Price Is Right",
+   "id": "ThePriceIsRight.us@HD",
+   "url": "https://jmp2.uk/plu-643f035d5a0cd50008361534.m3u8",
+   "group": "Reality & Game Shows",
+   "logo": "https://images.pluto.tv/channels/64c2214c2a7f2200089a0c4b/colorLogoPNG.png"
+  },
+  {
+   "dial": 164,
+   "name": "Iron Chef",
+   "match": "Iron Chef",
+   "id": "IronChef.us@US",
+   "url": "https://jmp2.uk/plu-6582f8dadfed030008e5a93d.m3u8",
+   "group": "Reality & Game Shows",
+   "logo": "https://i.imgur.com/rk7fMNe.png"
+  },
+  {
+   "dial": 165,
+   "name": "Law & Crime",
+   "match": "Law & Crime",
+   "id": "LawCrime.us@SD",
+   "url": "https://a-cdn.klowdtv.com/live3/law_720p/playlist.m3u8",
+   "group": "Crime & Court",
+   "logo": "https://yt3.googleusercontent.com/CRP3YudPa55QypbDnIvuh3erLZTsn2HK8ESR-2fJFFiLJVf7US2CKQELCKK_UowmHA3wCjAdxg=s512-c-k-c0x00ffffff-no-rj"
+  },
+  {
+   "dial": 166,
+   "name": "Cold Case Files",
+   "match": "Cold Case Files",
+   "id": "ColdCaseFiles.us@SD",
+   "url": "https://aegis-cloudfront-1.tubi.video/1e764712-0649-4946-bd7e-f1bbba3be6fa/playlist.m3u8",
+   "group": "Crime & Court",
+   "logo": "https://i.imgur.com/mowSfj6.png"
+  },
+  {
+   "dial": 167,
+   "name": "Cops",
+   "match": "Cops",
+   "id": "Cops.us@SD",
+   "url": "https://langleyproductions-cops-2-eu.rakuten.wurl.tv/playlist.m3u8",
+   "group": "Crime & Court",
+   "logo": "https://i.imgur.com/J3XO6V2.png"
+  },
+  {
+   "dial": 168,
+   "name": "Unsolved Mysteries",
+   "match": "Unsolved Mysteries",
+   "id": "UnsolvedMysteries.us@US",
+   "url": "https://d31z96rdrmwfsp.cloudfront.net/master.m3u8",
+   "group": "Crime & Court",
+   "logo": "https://i.imgur.com/De3khrX.png"
+  },
+  {
+   "dial": 169,
+   "name": "Dateline 24/7",
+   "match": "Dateline 24/7",
+   "id": "Dateline247.us@SD",
+   "url": "https://d1si3n1st4nkgb.cloudfront.net/10502/88896029/hls/master.m3u8?ads.xumo_channelId=88896029",
+   "group": "Crime & Court",
+   "logo": "https://i.imgur.com/8mAJuut.png"
+  },
+  {
+   "dial": 170,
+   "name": "48 Hours",
+   "match": "48 Hours",
+   "id": "48Hours.us@US",
+   "url": "https://dai.google.com/linear/hls/event/JUr94WL2QAiVpGNHY5n5dA/master.m3u8",
+   "group": "Crime & Court",
+   "logo": "https://images.pluto.tv/channels/6176f39e709f160007ec61c3/colorLogoPNG.png"
+  },
+  {
+   "dial": 171,
+   "name": "The New Detectives",
+   "match": "The New Detectives (United States)",
+   "id": "TheNewDetectives.us@US",
+   "url": "https://jmp2.uk/plu-5aea40b35126c2157123aa64.m3u8",
+   "group": "Crime & Court",
+   "logo": "https://images.pluto.tv/channels/62bdabbc5611f2000761ca30/colorLogoPNG.png"
+  },
+  {
+   "dial": 172,
+   "name": "The Judge Judy Channel",
+   "match": "The Judge Judy Channel",
+   "id": "TheJudgeJudyChannel.us@SD",
+   "url": "https://jmp2.uk/plu-6283d51144ad8f0007fa382d.m3u8",
+   "group": "Crime & Court",
+   "logo": "https://images.pluto.tv/channels/62e92e536f28870007fa9b3a/colorLogoPNG.png"
+  },
+  {
+   "dial": 173,
+   "name": "Pluto TV History",
+   "match": "Pluto TV History",
+   "id": "PlutoTVHistory.us@US",
+   "url": "https://jmp2.uk/plu-5a4d35dfa5c02e717a234f86.m3u8",
+   "group": "Discovery & History",
+   "logo": "https://i.imgur.com/XkQD5kM.png"
+  },
+  {
+   "dial": 174,
+   "name": "Pluto TV Science",
+   "match": "Pluto TV Science",
+   "id": "PlutoTVScience.us@US",
+   "url": "https://jmp2.uk/plu-563a970aa1a1f7fe7c9daad7.m3u8",
+   "group": "Discovery & History",
+   "logo": "https://i.imgur.com/uhunRoU.png"
+  },
+  {
+   "dial": 175,
+   "name": "Smithsonian Channel Selects",
+   "match": "Smithsonian Channel Selects (United States)",
+   "id": "SmithsonianChannelSelects.us@SD",
+   "url": "https://jmp2.uk/plu-5f21ea08007a49000762d349.m3u8",
+   "group": "Discovery & History",
+   "logo": "https://i.imgur.com/Kt5j8Vr.png"
+  },
+  {
+   "dial": 176,
+   "name": "PBS Nature",
+   "match": "PBS Nature",
+   "id": "PBSNature.us@SD",
+   "url": "https://d3mr43kyql7wgk.cloudfront.net/PBS_Nature.m3u8",
+   "group": "Discovery & History",
+   "logo": "https://i.imgur.com/Brry7cZ.png"
+  },
+  {
+   "dial": 177,
+   "name": "This Old House",
+   "match": "This Old House",
+   "id": "ThisOldHouse.us@SD",
+   "url": "https://thisoldhouse-2-us.roku.wurl.tv/playlist.m3u8",
+   "group": "Home, Food & Outdoors",
+   "logo": "https://i.imgur.com/nrVLyE6.png"
+  },
+  {
+   "dial": 178,
+   "name": "BBC Home & Garden",
+   "match": "BBC Home & Garden",
+   "id": "BBCHomeGarden.us@SD",
+   "url": "https://d11r33s5i066xh.cloudfront.net/playlist.m3u8",
+   "group": "Home, Food & Outdoors",
+   "logo": "https://i.imgur.com/rC0pi1D.png"
+  },
+  {
+   "dial": 179,
+   "name": "America's Test Kitchen",
+   "match": "America's Test Kitchen",
+   "id": "AmericasTestKitchen.us@SD",
+   "url": "https://jmp2.uk/plu-5e84f54a82f05300080e6746.m3u8",
+   "group": "Home, Food & Outdoors",
+   "logo": "https://i.imgur.com/prMkTsZ.png"
+  },
+  {
+   "dial": 180,
+   "name": "PBS Antiques Roadshow",
+   "match": "PBS Antiques Roadshow",
+   "id": "PBSAntiquesRoadshow.us@SD",
+   "url": "https://amg00953-pbsusa-antiroadshow-xumo-x6ud5.amagi.tv/playlist.m3u8",
+   "group": "Home, Food & Outdoors",
+   "logo": "https://i.imgur.com/U9CYaok.png"
+  },
+  {
+   "dial": 181,
+   "name": "The Bob Ross Channel",
+   "match": "The Bob Ross Channel",
+   "id": "TheBobRossChannel.us@SD",
+   "url": "https://aegis-cloudfront-1.tubi.video/45301c94-0d40-4cbb-b342-f5dc7949d76c/playlist.m3u8",
+   "group": "Home, Food & Outdoors",
+   "logo": "https://i.imgur.com/gFHKCbZ.png"
+  },
+  {
+   "dial": 182,
+   "name": "Gordon Ramsay's Hell's Kitchen",
+   "match": "Gordon Ramsay's Hell's Kitchen",
+   "id": "GordonRamsaysHellsKitchen.us@SD",
+   "url": "https://aegis-cloudfront-1.tubi.video/c8364f36-c60b-4a39-8d86-0b92db4611c0/index.m3u8",
+   "group": "Home, Food & Outdoors",
+   "logo": "https://i.imgur.com/WgN4T18.png"
+  },
+  {
+   "dial": 183,
+   "name": "Outdoor Channel",
+   "match": "Outdoor Channel",
+   "id": "OutdoorChannel.us@SD",
+   "url": "https://amg00718-outdoorchannela-outdoortv-samsungau-uc7mp.amagi.tv/playlist/amg00718-outdoorchannela-outdoortv-samsungau/playlist.m3u8",
+   "group": "Home, Food & Outdoors",
+   "logo": "https://i.imgur.com/Kh4MWaY.png"
+  },
+  {
+   "dial": 184,
+   "name": "PowerNation TV",
+   "match": "PowerNation TV",
+   "id": "PowerNationTV.us@SD",
+   "url": "https://amg01258-raycomsports-powernationau-samsungau-18bwc.amagi.tv/playlist.m3u8",
+   "group": "Home, Food & Outdoors",
+   "logo": "https://i.imgur.com/jguTO8E.png"
+  },
+  {
+   "dial": 185,
+   "name": "Hallmark Movies & More",
+   "match": "Hallmark Movies & More",
+   "id": "HallmarkMoviesMore.us@SD",
+   "url": "https://dbrb49pjoymg4.cloudfront.net/v1/master/3fec3e5cac39a52b2132f9c66c83dae043dc17d4/prod_default_xumo-ams-aws/master.m3u8?ads.xumo_channelId=99991709",
+   "group": "Movies",
+   "logo": "https://provider-static.plex.tv/epg/cms/production/29af70d1-d3ba-4a16-bc4d-bd99e7e7def4/hallmark-movies-and-more_color.png"
+  },
+  {
+   "dial": 186,
+   "name": "Pluto TV Action",
+   "match": "Pluto TV Action (United States)",
+   "id": "PlutoTVAction.us@US",
+   "url": "https://jmp2.uk/plu-561d7d484dc7c8770484914a.m3u8",
+   "group": "Movies",
+   "logo": "https://i.imgur.com/tDapGal.png"
+  },
+  {
+   "dial": 187,
+   "name": "Pluto TV Westerns",
+   "match": "Pluto TV Westerns (United States)",
+   "id": "PlutoTVWesterns.us@US",
+   "url": "https://jmp2.uk/plu-5b4e94282d4ec87bdcbb87cd.m3u8",
+   "group": "Movies",
+   "logo": "https://images.pluto.tv/channels/62bdacc96a3751000811842d/colorLogoPNG.png"
+  },
+  {
+   "dial": 188,
+   "name": "Pluto TV Horror",
+   "match": "Pluto TV Horror (United States)",
+   "id": "PlutoTVHorror.us@US",
+   "url": "https://jmp2.uk/plu-569546031a619b8f07ce6e25.m3u8",
+   "group": "Movies",
+   "logo": "https://images.pluto.tv/channels/569546031a619b8f07ce6e25/colorLogoPNG.png"
+  },
+  {
+   "dial": 189,
+   "name": "00s Replay",
+   "match": "00s Replay",
+   "id": "00sReplay.us@SD",
+   "url": "https://jmp2.uk/plu-62ba60f059624e000781c436.m3u8",
+   "group": "Movies",
+   "logo": "https://images.pluto.tv/channels/62ba60f059624e000781c436/colorLogoPNG.png"
+  },
+  {
+   "dial": 190,
+   "name": "90s Throwback",
+   "match": "90s Throwback",
+   "id": "90sThrowback.us@SD",
+   "url": "https://jmp2.uk/plu-5f4d86f519358a00072b978e.m3u8",
+   "group": "Movies",
+   "logo": "https://i.imgur.com/KoGko6M.png"
+  },
+  {
+   "dial": 191,
+   "name": "MovieSphere",
+   "match": "MovieSphere",
+   "id": "MovieSphere.us@US",
+   "url": "https://amg00353-lionsgatestudio-moviesphere-xumo-zh5u0.amagi.tv/playlist.m3u8",
+   "group": "Movies",
+   "logo": "https://i.imgur.com/h1ejU90.png"
+  },
+  {
+   "dial": 192,
+   "name": "Paramount Movie Channel",
+   "match": "Paramount Movie Channel",
+   "id": "ParamountMovieChannel.us@SD",
+   "url": "https://jmp2.uk/plu-5cb0cae7a461406ffe3f5213.m3u8",
+   "group": "Movies",
+   "logo": "https://i.imgur.com/sj5h9bl.png"
+  },
+  {
+   "dial": 193,
+   "name": "Spike Pluto TV",
+   "match": "Spike Pluto TV",
+   "id": "SpikePlutoTV.us@SD",
+   "url": "https://jmp2.uk/plu-5812bcc8237a6ff45d16c407.m3u8",
+   "group": "Entertainment",
+   "logo": "https://i.imgur.com/woY8Ecb.png"
+  },
+  {
+   "dial": 194,
+   "name": "E! Keeping Up",
+   "match": "E! Keeping Up",
+   "id": "EKeepingUp.us@SD",
+   "url": "https://xumo-xumoent-vc-117-a3ga4.fast.nbcuni.com/live/master.m3u8",
+   "group": "Entertainment",
+   "logo": "https://i.imgur.com/9F7VYDM.png"
+  },
+  {
+   "dial": 195,
+   "name": "Entertainment Tonight",
+   "match": "Entertainment Tonight",
+   "id": "EntertainmentTonight.us@SD",
+   "url": "https://enterbcef94b.airspace-cdn.cbsivideo.com/master.m3u8",
+   "group": "Entertainment",
+   "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Entertainment_Tonight_2021.svg/960px-Entertainment_Tonight_2021.svg.png"
+  },
+  {
+   "dial": 196,
+   "name": "TMZ",
+   "match": "TMZ",
+   "id": "TMZ.us@SD",
+   "url": "https://aegis-cloudfront-1.tubi.video/57c1fa3c-566b-4998-b6de-d6de67031d99/index.m3u8",
+   "group": "Entertainment",
+   "logo": "https://i.imgur.com/eLIe7Va.png"
+  },
+  {
+   "dial": 197,
+   "name": "QVC",
+   "match": "QVC (United States)",
+   "id": "QVC.us@SD",
+   "url": "https://qvc-amd-live.akamaized.net/hls/live/2034113/lsqvc1us/master.m3u8",
+   "group": "Shopping",
+   "logo": "https://play-lh.googleusercontent.com/58IEgCECrId5YdLMZWL9ohHzyZCY1lNduLVxK9QF1P5EZuSIJScTWEMaw2efd88zMkc"
+  },
+  {
+   "dial": 198,
+   "name": "HSN",
+   "match": "HSN",
+   "id": "HSN.us@East",
+   "url": "https://qvc-amd-live.akamaized.net/hls/live/2034113/lshsn1us/master.m3u8",
+   "group": "Shopping",
+   "logo": "https://m.media-amazon.com/images/I/419RyCp4+WL.png"
+  },
+  {
+   "dial": 199,
+   "name": "Jewelry TV",
+   "match": "Jewelry TV",
+   "id": "JewelryTV.us@SD",
+   "url": "https://content.jwplatform.com/live/broadcast/oe7UD7Ag.m3u8",
+   "group": "Shopping",
+   "logo": "https://upload.wikimedia.org/wikipedia/en/5/50/Jewelry_television_logo.png"
+  }
+ ]
+}

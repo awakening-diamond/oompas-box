@@ -1,8 +1,8 @@
 # OOMPAS Box — retro cable TV for your computer
 
-A 1985–2008-style cable dial of 24/7 Internet Archive channels, as a desktop app for Windows and Mac:
-18 OOMPAS Box channels (including a scrolling Guide channel and a Weather channel drawn live),
-[spelunkr.tv](https://spelunkr.tv)'s channels further up the dial, and your own IPTV channels if you want them.
+A 1985–2008-style cable dial as a desktop app for Windows and Mac: [spelunkr.tv](https://spelunkr.tv)'s channels,
+a hand-picked **2000s Cable** lineup of 100 free channels, your own IPTV playlists if you want them, and (optionally)
+18 OOMPAS Box channels of 24/7 Internet Archive tapes, including a scrolling Guide channel and a Weather channel drawn live.
 Flip channels with the keyboard, a remote, or the mouse; pull up the guide; star channels to make your own lineup.
 
 ## Installing
@@ -50,6 +50,11 @@ The app keeps its data (settings, schedules, your music for the Guide channel) i
 
 Settings → IPTV:
 
+- **2000s Cable** (Free channel lists… → OOMPAS picks): 100 national channels hand-picked from iptv-org's free US list to feel
+  like a 2000s cable box, on channels 100–199: news and weather, sports, MTV and VH1-style music, Nick and Toonami-style cartoons,
+  sitcoms, CSI and Star Trek, reality and game shows, crime, history, home and cooking, movies and shopping. Only official free
+  sources (Pluto TV, Samsung TV Plus, Xumo, Tubi, Roku and the networks' own feeds); no local stations. Its stream links are
+  looked up fresh each time, and the Countries/Languages/Categories filters don't apply to it. The list is in `pc-server/lineups/2000s-cable.json`.
 - **Free channel lists…**: turn on public, free-to-air channel lists from [iptv-org](https://github.com/iptv-org/iptv), by category
   (Classic TV, Animation, Movies, …) or by country. The adult category isn't offered, and **Hide adult channels** filters the rest.
   These are public streams that come and go, so some won't play.
@@ -62,6 +67,9 @@ Settings → IPTV:
   gives the US channels that are cooking *or* animation, and nothing else. (iptv-org has no separate anime category; anime is under Animation.)
 
 IPTV channels go on the dial from **500** (changeable), show in the guide with their listings, and play in the app at their own size.
+
+**OOMPAS Box channels** (Settings → Channels): *Off* (the default), *Guide & Weather* only, or *All*. Spelunkr's channels always stay;
+with OOMPAS Box's channels off they're on their own numbers.
 
 **My channels:** hold OK (or press \*) on any channel, in the guide or in the channel list (C), to star it. Starred channels get
 their own ★ section in the guide and the channel list, and **Settings → Channel up/down goes through → My channels** makes

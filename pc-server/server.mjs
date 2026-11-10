@@ -168,9 +168,10 @@ class Broadcast {
       if (!this.oompas) throw e;
       if (now() - (this.spWarnAt || 0) > 600000) { log('Spelunkr channels unavailable: ' + e.message); this.spWarnAt = now(); }
     }
-    if (this.merged && this.mergedFrom === sp.channels) return this.merged;
+    const mode = SETTINGS.oompas || 'off';   // which OOMPAS Box channels are on the dial
+    if (this.merged && this.mergedFrom === sp.channels && this.mergedMode === mode) return this.merged;
     const off = Number(this.oompas?.config.spelunkrDialOffset ?? 100);
-    const ours = (this.oompas?.channels || []).map((c, i) => {
+    const ours = (this.oompas?.channels || []).filter(c => mode === 'all' || (mode === 'guide' && (c.kind === 'guide' || c.kind === 'weather'))).map((c, i) => {
       const m = c.kind === 'mirror'
         ? sp.channels.find(s => String(s.name).trim().toUpperCase() === String(c.mirror || '').trim().toUpperCase()) : null;
       return { dial: Number(c.dial), id: 'oompas-' + c.dial, name: c.name, call: c.call || '', kind: c.kind,
@@ -183,6 +184,7 @@ class Broadcast {
       .filter(c => !taken.has(c.dial));
     this.merged = { channels: [...ours, ...theirs].sort((a, b) => a.dial - b.dial) };
     this.mergedFrom = sp.channels;
+    this.mergedMode = mode;
     return this.merged;
   }
 
@@ -1554,6 +1556,7 @@ const SETTINGS_FILE = path.join(APP_DATA, 'settings.json');
 const SETTINGS = {
   widescreen: CFG.widescreen, bars: CFG.bars, crt: true, banner: true, volume: 0.8, lastDial: null,
   iptv: { enabled: false, dialStart: 500, hideAdult: true, hideBroken: false, countries: [], languages: [], categories: [], lists: [] },
+  oompas: 'off',        // OOMPAS Box's own channels: off, guide (Guide & Weather only) or all
   favorites: [],        // starred channel ids: "My channels"
   zoom: 'trim',         // picture shape in the app: fit, trim (zoom past black bars), fill, stretch
   zoomByChannel: {},
@@ -1587,6 +1590,7 @@ function mergeSettings(patch) {
   if (p.lastDial != null) SETTINGS.lastDial = String(p.lastDial).slice(0, 8);
   if (Array.isArray(p.favorites)) SETTINGS.favorites = [...new Set(p.favorites.map(x => String(x).slice(0, 80)))].slice(0, 2000);
   if (['all', 'favorites'].includes(p.surf)) SETTINGS.surf = p.surf;
+  if (['off', 'guide', 'all'].includes(p.oompas)) SETTINGS.oompas = p.oompas;
   if (['high', 'standard', 'low'].includes(p.resolution)) SETTINGS.resolution = p.resolution;
   const ZOOMS = ['fit', 'trim', 'fill', 'stretch'];
   if (ZOOMS.includes(p.zoom)) SETTINGS.zoom = p.zoom;
@@ -1631,8 +1635,8 @@ function sectionOf(c) {
 // Every channel the app can show: OOMPAS Box and Spelunkr, then IPTV.
 async function appChannels(bc) {
   const base = (await bc.lineup()).channels;
-  const ids = new Set(base.map(c => c.id));
-  const all = [...base, ...(bc.iptv?.channels || []).filter(c => !ids.has(c.id))].sort((a, b) => a.dial - b.dial);
+  const ids = new Set(base.map(c => c.id)), dials = new Set(base.map(c => c.dial));
+  const all = [...base, ...(bc.iptv?.channels || []).filter(c => !ids.has(c.id) && !dials.has(c.dial))].sort((a, b) => a.dial - b.dial);
   const at = now();
   return Promise.all(all.map(async c => {
     let progs = [];
