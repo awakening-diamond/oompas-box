@@ -9,4 +9,6 @@ contextBridge.exposeInMainWorld('oompasApp', {
   fitWindow: (w, h) => ipcRenderer.send('fit-window', Number(w), Number(h)),
   // Hide YouTube's own on-screen extras (title bar, logo, end cards, pause/ad overlays) in its player.
   setYouTubeClean: on => ipcRenderer.send('yt-clean', !!on),
+  // How loud a YouTube video is (YouTube's own measurement, dB against its reference level), for levelling.
+  youtubeLoudness: videoId => ipcRenderer.invoke('yt-loudness', String(videoId)),
 });

@@ -392,6 +392,22 @@ function alwaysVisible() {
     if (/^https:\/\/www\.youtube(-nocookie)?\.com\/embed\//.test(f.url)) f.executeJavaScript(js).catch(() => {});
 }
 
+// Reads YouTube's loudness measurement for a video from its player frame.
+ipcMain.handle('yt-loudness', async (e, videoId) => {
+  if (!win || win.isDestroyed() || !/^[\w-]{11}$/.test(videoId)) return null;
+  const js = `(() => { const p = document.querySelector('#movie_player');
+    const r = (p && p.getPlayerResponse && p.getPlayerResponse()) || window.ytInitialPlayerResponse || {};
+    const a = (r.playerConfig && r.playerConfig.audioConfig) || {};
+    const id = (r.videoDetails && r.videoDetails.videoId) || '';
+    return { id, loudnessDb: a.loudnessDb, perceptualLoudnessDb: a.perceptualLoudnessDb };
+  })()`;
+  for (const f of win.webContents.mainFrame.framesInSubtree) {
+    if (!/^https:\/\/www\.youtube(-nocookie)?\.com\/embed\//.test(f.url) || !f.url.includes(videoId)) continue;
+    try { const r = await f.executeJavaScript(js); if (r && (r.id === videoId || !r.id) && Number.isFinite(r.loudnessDb)) return r; } catch {}
+  }
+  return null;
+});
+
 ipcMain.on('yt-clean', (e, on) => { ytClean = !!on; styleYouTubeFrames(); });
 
 ipcMain.on('fullscreen', () => { if (win) win.setFullScreen(!win.isFullScreen()); });

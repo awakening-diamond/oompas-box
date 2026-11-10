@@ -3,6 +3,8 @@
 - Channels keep playing (and keep drawing, for OOMPAS Cast) when the OOMPAS Box window is covered by other windows,
   minimized or not focused. YouTube's player no longer pauses itself, and if anything pauses a channel it carries on
   where the schedule is.
+- YouTube channels are **levelled** to match the other channels: they play a little lower, and quiet videos are
+  turned up (from YouTube's own loudness measurement of each video), so you're not riding the volume.
 
 ## OOMPAS Box 1.4.1
 

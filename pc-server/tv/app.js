@@ -218,6 +218,24 @@ function ytApi() {
 }
 const YT_VARS = () => ({ autoplay: 1, controls: 0, disablekb: 1, fs: 0, rel: 0, iv_load_policy: 3, playsinline: 1, cc_load_policy: ccOn() ? 1 : 0, cc_lang_pref: 'en', origin: location.origin });
 let ytTimer = 0, ytEnded = { id: '', at: 0 };
+// Levelling: the old-tape channels play at about -20 LUFS; YouTube plays at its reference (about -14).
+// So YouTube videos play 6 dB down, and quieter videos get up to 6 dB of that back, from YouTube's own
+// loudness measurement (YouTube already turns down the loud ones itself).
+const YT_DOWN_DB = 6;
+S.ytGain = 10 ** (-YT_DOWN_DB / 20);
+const ytVol = () => Math.max(0, Math.min(100, Math.round(S.volume * 100 * (S.ytGain ?? 1))));
+async function levelYt(p, videoId, seq) {
+  S.ytGain = 10 ** (-YT_DOWN_DB / 20);
+  try { p.setVolume(ytVol()); } catch {}
+  if (!window.oompasApp?.youtubeLoudness) return;
+  let r = null;
+  for (let i = 0; i < 6 && !r; i++) { r = await window.oompasApp.youtubeLoudness(videoId).catch(() => null); if (!r) await sleep(700); }
+  if (!r || seq !== tuneSeq || S.yt !== p) return;
+  const L = Number(r.loudnessDb) || 0;                     // dB against YouTube's reference; negative = quieter
+  const db = Math.min(0, -YT_DOWN_DB - Math.min(0, L));     // boost quiet ones, never above full
+  S.ytGain = 10 ** (db / 20);
+  try { p.setVolume(ytVol()); } catch {}
+}
 function stopYt() {
   clearTimeout(ytTimer);
   if (S.yt) { try { S.yt.destroy(); } catch {} S.yt = null; }
@@ -249,7 +267,7 @@ async function playYt(info, seq) {
     events: {
       onReady: e => {
         if (seq !== tuneSeq) return;
-        e.target.setVolume(Math.round(S.volume * 100));
+        e.target.setVolume(ytVol());
         if (S.muted) e.target.mute(); else e.target.unMute();
         if (info.start > 3) e.target.seekTo(info.start, true);
         e.target.playVideo();
@@ -259,6 +277,7 @@ async function playYt(info, seq) {
         if (e.data === Y.PlayerState.PLAYING && !started) {
           started = true; clearTimeout(watchdog); staticOn(false); $('#nosignal').hidden = true;
           captionsSoon();
+          levelYt(e.target, info.videoId, seq);
           // The real length differs from the list's: tell the server, so the schedule is right from now on.
           const real = e.target.getDuration?.() || 0;
           if (real > 0 && info.dur && Math.abs(real - info.dur) > 3 && e.target.getVideoData?.()?.video_id === info.videoId)
@@ -566,7 +585,7 @@ function setVolume(v) {
   S.volume = Math.round(Math.min(1, Math.max(0, v)) * 20) / 20;
   S.muted = false;
   video.volume = S.volume; video.muted = false;
-  try { S.yt?.setVolume(Math.round(S.volume * 100)); S.yt?.unMute(); } catch {}
+  try { S.yt?.setVolume(ytVol()); S.yt?.unMute(); } catch {}
   showVolume();
   saveSetting({ volume: S.volume });
 }
