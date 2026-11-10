@@ -168,6 +168,14 @@ OOMPAS Box checks for new versions by itself ([Releases](https://github.com/awak
 - **Mac:** the app isn't signed by Apple, so it can't replace itself. It tells you a new version is out and opens the download page;
   replace the app in Applications. Your settings and channels stay either way.
 
+**Channel list fixes come without an update.** The built-in lists in `pc-server/lineups/` (`youtube.json` for channels 69 and
+420, `2000s-cable.json`) are also read from this repo's main branch every few hours. Edit one, raise its `"updated"` date, and
+push: every installed app picks it up, no release needed.
+
+**Making a release:** bump `"version"` in `desktop/package.json`, add notes under a `## OOMPAS Box x.y.z` heading in
+`CHANGES.md`, commit, then `git tag x.y.z && git push origin x.y.z`. GitHub Actions builds Windows and Mac and publishes the
+release (see `.github/workflows/release.yml`).
+
 ## Casting to a CRT
 
 OOMPAS Box itself is a PC/Mac app. To watch it on a CRT through a MiSTer, cast the OOMPAS Box window with **OOMPAS Cast**

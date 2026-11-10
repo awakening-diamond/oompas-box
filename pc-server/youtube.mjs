@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { liveFileSync, liveFile } from './live.mjs';
 
 const EPOCH = Date.UTC(2026, 0, 1);
 const COLORS = ['#ff4e45', '#ff8a3d', '#ffd23f', '#5ad27a', '#4fb0ff', '#a07bff'];
@@ -39,28 +40,39 @@ export function parseYouTubeLink(raw) {
   return null;
 }
 
-// Channels that come with the app. Same YouTube channel on two dials, each with its own shuffle.
-export const BUILTIN = [
-  { id: 'hb69', handle: '@Hungrybear9562', name: 'HungryBear 69', dial: 69 },
-  { id: 'hb420', handle: '@Hungrybear9562', name: 'HungryBear 420', dial: 420 },
-];
-export const BUILTIN_DIALS = new Set(BUILTIN.map(b => b.dial));
+// Channels that come with the app are listed in lineups/youtube.json, which can be updated from
+// GitHub without a new release (see live.mjs).
+const validBuiltins = j => Array.isArray(j?.channels) && j.channels.every(b => /^[\w-]{2,20}$/.test(b.id) && /^@[\w.-]{2,}$/.test(b.handle) && b.dial >= 1 && b.dial <= 9999);
 
 export class YouTube {
-  constructor({ dataDir, log = () => {}, fetchImpl = fetch }) {
+  constructor({ dataDir, cacheDir, log = () => {}, fetchImpl = fetch }) {
+    this.cacheDir = cacheDir;
     this.file = path.join(dataDir, 'youtube.json');
     this.log = log;
     this.fetch = fetchImpl;
     this.channels = [];
     try { this.channels = JSON.parse(fs.readFileSync(this.file, 'utf8')).channels || []; } catch {}
     this.cache = new Map();   // channel id -> { cycle, order, total }
+    this.builtins = liveFileSync('youtube.json', cacheDir, validBuiltins)?.channels || [];
     this.ensureBuiltins();
   }
 
+  get builtinDials() { return new Set(this.builtins.map(b => b.dial)); }
+
+  // Checks GitHub for changes to the built-in channels.
+  async updateBuiltins(force = false) {
+    const j = await liveFile('youtube.json', { cacheDir: this.cacheDir, log: this.log, force, ok: validBuiltins });
+    if (j && JSON.stringify(j.channels) !== JSON.stringify(this.builtins)) { this.builtins = j.channels; this.ensureBuiltins(); this.log('YouTube: built-in channels updated'); }
+    await this.resolveBuiltins();
+  }
+
   ensureBuiltins() {
-    for (const b of BUILTIN) {
+    const BUILTIN_DIALS = this.builtinDials, ids = new Set(this.builtins.map(b => b.id));
+    this.channels = this.channels.filter(c => !c.builtin || ids.has(c.id));
+    for (const b of this.builtins) {
       let c = this.channels.find(x => x.id === b.id);
       if (!c) { c = { id: b.id, list: '', link: '', videos: [], bad: [], scannedAt: 0, added: Date.now() }; this.channels.unshift(c); }
+      if (c.handle && c.handle.toLowerCase() !== b.handle.toLowerCase()) Object.assign(c, { list: '', videos: [], bad: [], scannedAt: 0 });   // a different YouTube channel now
       Object.assign(c, { name: b.name, dial: b.dial, handle: b.handle, link: `https://www.youtube.com/${b.handle}`, order: 'shuffle', builtin: true });
     }
     // Anything the user put on a built-in channel's number moves to the next free one from 300.
@@ -72,16 +84,17 @@ export class YouTube {
   // Built-in channels are known by their @handle; the uploads list is looked up once on each computer.
   async resolveBuiltins() {
     if (this.resolving) return;
-    const c = this.channels.find(x => x.builtin && !x.list);
-    if (!c) return;
     this.resolving = true;
     try {
-      const { list } = await this.resolveHandle(c.handle);
-      for (const o of this.channels) if (o.handle === c.handle && !o.list) o.list = list;
-      this.save();
-      this.log(`YouTube: found ${c.handle}`);
-    } catch (e) { this.log(`YouTube: couldn\u2019t look up ${c.handle} yet (${e.message})`); }
-    finally { this.resolving = false; }
+      for (const handle of new Set(this.channels.filter(x => x.builtin && !x.list).map(x => x.handle))) {
+        try {
+          const { list } = await this.resolveHandle(handle);
+          for (const o of this.channels) if (o.handle === handle && !o.list) o.list = list;
+          this.save();
+          this.log(`YouTube: found ${handle}`);
+        } catch (e) { this.log(`YouTube: couldn’t look up ${handle} yet (${e.message})`); }
+      }
+    } finally { this.resolving = false; }
   }
 
   save() {
@@ -122,7 +135,7 @@ export class YouTube {
     const c = this.channels.find(x => x.id === id);
     if (!c) throw Object.assign(new Error('No such YouTube channel'), { status: 404 });
     if (c.builtin) throw Object.assign(new Error('That channel comes with OOMPAS Box'), { status: 400 });
-    if (BUILTIN_DIALS.has(+patch.dial)) throw Object.assign(new Error(`Channel ${patch.dial} is taken`), { status: 400 });
+    if (this.builtinDials.has(+patch.dial)) throw Object.assign(new Error(`Channel ${patch.dial} is taken`), { status: 400 });
     if (typeof patch.name === 'string' && patch.name.trim()) c.name = patch.name.trim().slice(0, 60);
     if (Number.isFinite(+patch.dial) && +patch.dial >= 1 && +patch.dial <= 9999) c.dial = Math.round(+patch.dial);
     if (['shuffle', 'inorder'].includes(patch.order)) c.order = patch.order;
@@ -162,7 +175,7 @@ export class YouTube {
 
   // Lineup entries (dials already settled by the server).
   lineupChannels() {
-    return this.channels.filter(c => c.dial).map((c, i) => ({
+    return this.channels.filter(c => c.dial).map(c => ({
       dial: c.dial, id: 'yt-' + c.id, ytId: c.id, name: c.name, call: c.name.replace(/[^A-Za-z0-9]/g, '').slice(0, 5).toUpperCase() || 'YT',
       color: COLORS[c.dial % COLORS.length], kind: 'youtube', list: 'YouTube', cats: ['YouTube'], group: 'YouTube',
       description: this.playable(c).length ? `${this.playable(c).length} videos from YouTube` : 'Not scanned yet',

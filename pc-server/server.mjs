@@ -22,7 +22,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { OompasNet, hash32, rng, parseDuration, shorten } from './oompas.mjs';
 import { Worker } from 'node:worker_threads';
 import { Iptv, CATALOG, proxy as iptvProxy, proxyUrl } from './iptv.mjs';
-import { YouTube, BUILTIN_DIALS } from './youtube.mjs';
+import { YouTube } from './youtube.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -191,7 +191,7 @@ class Broadcast {
 
   async channelByDial(dial) {
     const l = await this.lineup();
-    const c = (BUILTIN_DIALS.has(+dial) && this.youtube?.lineupChannels().find(c => String(c.dial) === String(dial)))
+    const c = (this.youtube?.builtinDials.has(+dial) && this.youtube?.lineupChannels().find(c => String(c.dial) === String(dial)))
       || l.channels.find(c => String(c.dial) === String(dial))
       || this.youtube?.lineupChannels().find(c => String(c.dial) === String(dial))
       || this.iptv?.channels.find(c => String(c.dial) === String(dial));
@@ -1646,6 +1646,7 @@ function sectionOf(c) {
 // Every channel the app can show: OOMPAS Box and Spelunkr, then IPTV.
 // Everything on the dial: our channels first, then YouTube, then IPTV (each skips a dial already taken).
 async function allChannels(bc) {
+  const BUILTIN_DIALS = bc.youtube?.builtinDials || new Set();
   const base = (await bc.lineup()).channels.filter(c => !BUILTIN_DIALS.has(c.dial));   // the built-in YouTube dials always win
   const dials = new Set([...base.map(c => c.dial), ...BUILTIN_DIALS]);
   const yt = (bc.youtube?.lineupChannels() || []).filter(c => BUILTIN_DIALS.has(c.dial) || (!dials.has(c.dial) && dials.add(c.dial)));
@@ -1836,9 +1837,9 @@ async function main() {
   }
   const bc = new Broadcast(engine, oompas);
   bc.iptv = new Iptv({ cacheDir: CFG.cacheDir, log });
-  bc.youtube = new YouTube({ dataDir: APP_DATA, log });
-  bc.youtube.resolveBuiltins();
-  setInterval(() => bc.youtube.resolveBuiltins(), 30 * 60e3).unref();
+  bc.youtube = new YouTube({ dataDir: APP_DATA, cacheDir: CFG.cacheDir, log });
+  bc.youtube.updateBuiltins();
+  setInterval(() => bc.youtube.updateBuiltins(), 30 * 60e3).unref();
   applySettings(bc);
   setInterval(() => bc.iptv.refresh().catch(() => {}), 3600e3).unref();
   const l = await bc.lineup();

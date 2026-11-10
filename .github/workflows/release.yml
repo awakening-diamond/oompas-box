@@ -1,0 +1,83 @@
+# Builds OOMPAS Box for Windows and Mac and publishes a GitHub release when a version tag is pushed:
+#   (bump "version" in desktop/package.json, add notes to CHANGES.md)  git tag 1.2.3 && git push origin 1.2.3
+# The installed apps pick the release up through their update check.
+name: Release
+
+on:
+  push:
+    tags: ['v*', '[0-9]*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  FFMPEG_STATIC: https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1
+
+jobs:
+  build:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: windows-latest
+            target: --win nsis --x64
+          - os: macos-latest
+            target: --mac zip --x64 --arm64 -c.mac.identity=-
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Check the tag matches the app version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          v=$(node -p "require('./package.json').version")
+          [ "$v" = "${GITHUB_REF_NAME#v}" ] || { echo "Tag ${GITHUB_REF_NAME} but desktop/package.json says $v"; exit 1; }
+      - name: Get FFmpeg
+        run: |
+          get() { mkdir -p "ffmpeg/$2"; curl -fsSL "$FFMPEG_STATIC/$1.gz" | gunzip > "ffmpeg/$2/$3"; chmod +x "ffmpeg/$2/$3"; }
+          if [ "$RUNNER_OS" = Windows ]; then get ffmpeg-win32-x64 win-x64 ffmpeg.exe
+          else get ffmpeg-darwin-x64 mac-x64 ffmpeg; get ffmpeg-darwin-arm64 mac-arm64 ffmpeg; fi
+      - run: npm ci
+      - name: Build
+        run: npx electron-builder ${{ matrix.target }} --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ runner.os }}
+          path: |
+            desktop/dist/*.exe
+            desktop/dist/*.blockmap
+            desktop/dist/*.zip
+            desktop/dist/latest*.yml
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - name: Release notes from CHANGES.md
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          awk -v h="## OOMPAS Box $v" '$0==h{on=1;next} /^## /{if(on)exit} on' CHANGES.md > notes.md
+          [ -s notes.md ] || echo "OOMPAS Box $v" > notes.md
+          ls -la out; cat notes.md
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: OOMPAS Box ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          body_path: notes.md
+          files: out/*
+          make_latest: true

@@ -3,11 +3,10 @@
 // streams. The channels go on the dial after OOMPAS Box's own (from settings.iptv.dialStart).
 import fs from 'node:fs';
 import path from 'node:path';
+import { liveFile } from './live.mjs';
 import zlib from 'node:zlib';
 import crypto from 'node:crypto';
-import { fileURLToPath } from 'node:url';
 
-const LINEUPS = path.join(path.dirname(fileURLToPath(import.meta.url)), 'lineups');
 
 // Free channel lists offered in Settings. iptv-org (github.com/iptv-org/iptv) collects
 // publicly available, free-to-air streams. Its adult category is not offered.
@@ -309,7 +308,9 @@ export class Iptv {
   // A hand-picked lineup: fixed channel numbers, stream links looked up fresh in its source list
   // (matched by iptv-org channel id, official free sources first), with the saved link as a fallback.
   async loadCurated(l, force) {
-    const def = JSON.parse(fs.readFileSync(path.join(LINEUPS, l.url.slice(8).replace(/[^\w-]/g, '') + '.json'), 'utf8'));
+    const name = l.url.slice(8).replace(/[^\w-]/g, '') + '.json';
+    const def = await liveFile(name, { cacheDir: this.dir, log: this.log, force, ok: j => Array.isArray(j?.channels) && j.channels.length > 0 && typeof j.source === 'string' });
+    if (!def) throw new Error(`no lineup ${name}`);
     const cacheFile = path.join(this.dir, sha(def.source) + '.m3u');
     let src = [];
     try {

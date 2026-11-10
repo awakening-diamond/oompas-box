@@ -1,3 +1,9 @@
+## OOMPAS Box 1.2.2
+
+- The built-in channel lists (channels 69 and 420, the 2000s Cable lineup) now update themselves from GitHub every few hours,
+  so fixes to them no longer need a new version.
+- Releases are now built and published automatically.
+
 ## OOMPAS Box 1.2.1
 
 - New: **channels 69 and 420**, built in: Hungrybear9562's videos, shuffled, each channel on its own schedule.
