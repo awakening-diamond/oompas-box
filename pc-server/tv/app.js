@@ -683,7 +683,7 @@ function pageRows() {
              names: ZOOM_NAMES, get: () => st.zoom || 'trim', set: v => { st.zoom = v; saveSetting({ zoom: v }); layout(); } });
     if (Object.keys(st.zoomByChannel || {}).length)
       R.push({ type: 'btn', label: 'Forget per-channel picture shapes', val: `${Object.keys(st.zoomByChannel).length}`, act: () => { st.zoomByChannel = {}; saveSetting({ zoomByChannel: {} }); layout(); toast('Every channel uses the default shape again'); renderSettings(); } });
-    R.push({ type: 'choice', label: 'Stream resolution', sub: 'Lower is lighter on the network and looks more like the MiSTer', values: ['high', 'standard', 'low'],
+    R.push({ type: 'choice', label: 'Stream resolution', sub: 'Lower uses less CPU and network, and Low has a soft vintage look', values: ['high', 'standard', 'low'],
              names: { high: 'High 960\u00D7720', standard: 'Standard 640\u00D7480', low: 'Low 320\u00D7240' }, get: () => st.resolution || 'high',
              set: v => { st.resolution = v; saveSetting({ resolution: v }, true).then(() => { if (S.cur) tune(S.cur.dial, { quiet: true }); }); } });
     if (window.oompasApp?.fitWindow)
@@ -716,16 +716,10 @@ function pageRows() {
     R.push({ type: 'btn', label: 'Check which channels play', sub: 'Tests every IPTV channel from this PC (takes a minute or two)',
              val: ck?.running ? `Checking ${ck.done}/${ck.total}` : ck?.at ? `${ck.ok} play \u00B7 ${ck.bad} don\u2019t` : '\u25B8', act: startCheck });
     R.push({ type: 'toggle', label: 'Hide channels that don\u2019t play', sub: 'Uses the last check (re-check now and then: streams come and go)', get: () => !!iptvSet().hideBroken, set: v => setIptv({ hideBroken: v }, 'light') });
-    R.push({ type: 'choice', label: 'IPTV on the MiSTer', sub: 'Which IPTV channels go on the MiSTer\u2019s dial', values: [true, 'starred', false],
-             names: { true: 'All', starred: 'Starred only', false: 'Off' }, get: () => iptvSet().onMister ?? true, set: v => setIptv({ onMister: v }) });
     R.push({ type: 'choice', label: 'IPTV starts at channel', values: [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000], get: () => iptvSet().dialStart, set: v => setIptv({ dialStart: v }, 'light') });
     R.push({ type: 'toggle', label: 'Hide adult channels', get: () => iptvSet().hideAdult !== false, set: v => setIptv({ hideAdult: v }, 'light') });
     R.push({ type: 'btn', label: 'Reload playlists', val: '↻', act: reloadIptv });
-    sec('MiSTer');
-    R.push({ type: 'info', label: 'Server address', sub: 'The MiSTer finds this by itself', val: (srv.addresses || []).map(a => `${a}:${srv.port}`).join('  ') || '—' });
-    const w = (srv.watching || []).filter(x => x.viewer !== 'app').map(x => `${x.dial} (${x.viewer || x.addr})`);
-    R.push({ type: 'info', label: 'Watching on other screens', val: w.length ? w.join(', ') : 'Nobody' });
-    R.push({ type: 'btn', label: 'Server log', val: '▸', act: () => goPage('log') });
+    R.push({ type: 'btn', label: 'Server log', sub: 'What the OOMPAS engine is doing (for troubleshooting)', val: '▸', act: () => goPage('log') });
     sec('App');
     R.push({ type: 'btn', label: 'Full screen', sub: 'Or press F', val: '⛶', act: toggleFullscreen });
     R.push({ type: 'info', label: 'Keys', sub: '↑↓ channels · 0-9 number · G guide \u00B7 C channel list \u00B7 OK info \u00B7 hold OK or * star \u00B7 ←→ volume · Z picture shape · M mute · Back last channel · S settings', val: '' });

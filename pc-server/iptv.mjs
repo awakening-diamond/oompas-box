@@ -100,7 +100,7 @@ export class Iptv {
     fs.mkdirSync(this.dir, { recursive: true });
     this.log = log;
     this.fetch = fetchImpl;
-    this.settings = { enabled: false, lists: [], dialStart: 500, hideAdult: true, onMister: true, countries: [], categories: [] };
+    this.settings = { enabled: false, lists: [], dialStart: 500, hideAdult: true, countries: [], categories: [] };
     this.categories = {};       // category -> channels (within the chosen countries)
     this.languages = {};        // language -> channels (within the chosen countries)
     this.langByUrl = new Map(); this.langById = new Map(); this.langAt = 0;

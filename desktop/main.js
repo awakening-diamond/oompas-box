@@ -1,5 +1,5 @@
 // OOMPAS Box desktop app (Windows and Mac).
-// Starts the OOMPAS server (the same one the MiSTer uses) with a bundled FFmpeg, then shows
+// Starts the OOMPAS engine (pc-server/server.mjs) with a bundled FFmpeg, then shows
 // the TV interface (served by the server at /tv/) in a full-window player. Quitting the app
 // stops the server and everything it started.
 const { app, BrowserWindow, Menu, shell, ipcMain, dialog, powerSaveBlocker, screen } = require('electron');
@@ -21,6 +21,8 @@ const FFMPEG = (() => {
 })();
 const DATA = app.getPath('userData');
 const TOKEN = crypto.randomBytes(16).toString('hex');
+// Your own copy of the channel lineup (File > Edit Channel Lineup); used instead of the built-in one.
+const LINEUP = path.join(DATA, 'oompas-channels.json');
 
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
@@ -112,7 +114,7 @@ async function startServer() {
     const r = await dialog.showMessageBox({
       type: 'warning', buttons: ['Try again', 'Quit'], defaultId: 0, cancelId: 1, title: 'OOMPAS Box',
       message: `An older OOMPAS server (or another program) is using port ${PORT}.`,
-      detail: 'Close the OOMPAS Server window or start-server.bat, then press Try again.\n\nThis app runs its own, newer server, which your MiSTer can use too.',
+      detail: 'Close the other program (an older OOMPAS server window, for example), then press Try again.',
     });
     if (r.response === 0) return startServer();
     app.quit();
@@ -126,6 +128,7 @@ async function startServer() {
   server = spawn(process.execPath, [path.join(SERVER_DIR, 'server.mjs')], {
     cwd: SERVER_DIR, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', PORT: String(PORT), FFMPEG,
+           ...(fs.existsSync(LINEUP) ? { OOMPAS_CHANNELS: LINEUP } : {}),
            APP_DATA: DATA, OOMPAS_CACHE: path.join(DATA, 'oompas-cache'), MUSIC_DIR: path.join(DATA, 'music'),
            ENGINE_FILE: path.join(DATA, 'vendor', 'schedule-engine.mjs'), OOMPAS_APP_TOKEN: TOKEN },
   });
@@ -209,6 +212,7 @@ function buildMenu() {
     { label: 'File', submenu: [
       { label: 'Open Data Folder', click: () => shell.openPath(DATA) },
       { label: 'Open Music Folder', click: () => shell.openPath(path.join(DATA, 'music')) },
+      { label: 'Edit Channel Lineup\u2026', click: () => editLineup() },
       { label: 'Open in Browser', click: () => shell.openExternal(`http://localhost:${PORT}/tv/`) },
       { type: 'separator' },
       isMac ? { role: 'close' } : { role: 'quit' },
@@ -217,7 +221,7 @@ function buildMenu() {
       { role: 'togglefullscreen', accelerator: isMac ? 'Ctrl+Cmd+F' : 'F11' },
       { label: 'Window Size', submenu: [
         ...[[320, 240], [640, 480], [800, 600], [960, 720], [1024, 768], [1280, 960], [1440, 1080]].map(([w, h], i) => ({
-          label: `${w} \u00D7 ${h}` + (w === 320 ? '  (MiSTer size)' : ''), accelerator: i ? `CmdOrCtrl+${i}` : undefined,
+          label: `${w} \u00D7 ${h}`, accelerator: i ? `CmdOrCtrl+${i}` : undefined,
           click: () => setPictureSize(w, h) })),
         { type: 'separator' },
         { label: 'Widescreen 854 \u00D7 480', click: () => setPictureSize(854, 480) },
@@ -233,10 +237,20 @@ function buildMenu() {
       { label: 'Check for Updates\u2026', click: () => checkForUpdatesNow() },
       { label: 'Server Log', click: () => showLog() },
       { label: 'About OOMPAS Box', click: () => dialog.showMessageBox({ title: 'OOMPAS Box', message: `OOMPAS Box ${app.getVersion()}`,
-        detail: `Server: http://localhost:${PORT}/  (your MiSTer finds it by itself)\nData: ${DATA}\nFFmpeg: ${FFMPEG}\n\nVideo from the Internet Archive. Spelunkr channels from spelunkr.tv. Free IPTV lists from iptv-org.` }) },
+        detail: `Data: ${DATA}\nFFmpeg: ${FFMPEG}\n\nVideo from the Internet Archive. Spelunkr channels from spelunkr.tv. Free IPTV lists from iptv-org.` }) },
     ] },
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
+async function editLineup() {
+  if (!fs.existsSync(LINEUP)) fs.copyFileSync(path.join(SERVER_DIR, 'oompas-channels.json'), LINEUP);
+  shell.showItemInFolder(LINEUP);
+  await shell.openPath(LINEUP);
+  const r = await dialog.showMessageBox({ type: 'info', title: 'OOMPAS Box', buttons: ['Restart now', 'Later'], defaultId: 0, cancelId: 1,
+    message: 'Your own copy of the channel lineup is open.',
+    detail: `${LINEUP}\n\nSave your changes, then restart OOMPAS Box to use them. To go back to the built-in lineup, delete that file.` });
+  if (r.response === 0) { app.relaunch(); app.quit(); }
 }
 
 function showLog() {

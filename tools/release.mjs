@@ -39,8 +39,6 @@ for (const [dir, arch] of [['mac', 'x64'], ['mac-arm64', 'arm64']]) {
 }
 fs.writeFileSync(path.join(dist, 'latest-mac.yml'), macYml);
 
-// MiSTer scripts: update_all database, committed to the repo.
-run(`node tools/make-mister-db.mjs ${owner} ${repo} main`, { cwd: ROOT });
 try { run('git add -A && git commit -m "OOMPAS Box ' + v + '" && git push', { cwd: ROOT }); } catch { console.warn('git push skipped'); }
 
 const assets = [`OOMPAS-Box-Setup-${v}.exe`, `OOMPAS-Box-Setup-${v}.exe.blockmap`, 'latest.yml',

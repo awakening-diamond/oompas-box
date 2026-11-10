@@ -9,4 +9,3 @@ pc-server/music/*
 !pc-server/music/PUT-MUSIC-HERE.txt
 __pycache__/
 *.pyc
-mister/Scripts/.spelunkr/last_channel

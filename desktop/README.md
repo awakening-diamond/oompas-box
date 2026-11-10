@@ -28,7 +28,7 @@ Everything in the interface works with arrow keys, OK and Back, scales to the sc
 it's already shaped for a remote. The simplest TV app is a thin wrapper that opens the server's page:
 
 - **Android TV / Google TV / Fire TV:** a WebView app (or Capacitor) that asks for the PC's address once and loads
-  `http://<pc>:8090/tv/`. Map the remote's Back to `Escape`, and Channel Up/Down and Guide pass through as keys
+  `http://<pc>:8090/tv/` (start the PC side with `LISTEN=0.0.0.0` so other devices can reach it). Map the remote's Back to `Escape`, and Channel Up/Down and Guide pass through as keys
   (`ChannelUp`, `ChannelDown`, `Guide` are already handled). The PC keeps doing the work (schedules, IPTV, transcoding).
 - **Apple TV:** tvOS has no web view, so it would need a native player that uses the same `/api/*` endpoints
   (the streams are standard MPEG-TS and HLS).

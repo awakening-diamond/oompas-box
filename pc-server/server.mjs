@@ -1,20 +1,16 @@
 #!/usr/bin/env node
-// OOMPAS Box -> MiSTer CRT server.
+// OOMPAS Box server: the engine behind the OOMPAS Box app.
 //
-// Runs on your PC. OOMPAS Box's own channels (oompas-channels.json) are scheduled
-// here from Internet Archive searches; the Guide and Weather channels are drawn live;
-// Spelunkr's channels (using Spelunkr's public schedule data and scheduler) sit above
-// them on the dial. Video is re-encoded to MPEG-2 so the MiSTer's ARM CPU can play it
-// on a 15 kHz CRT without stuttering.
+// OOMPAS Box's own channels (oompas-channels.json) are scheduled here from Internet
+// Archive searches; the Guide and Weather channels are drawn live; Spelunkr's channels
+// (using Spelunkr's public schedule data and scheduler) sit above them on the dial; IPTV
+// playlists can be added on top. Each channel streams as H.264 + AAC in MPEG-TS, which
+// the TV interface (tv/, served at /tv/) plays.
 //
-//   node server.mjs            (default port 8090)
-//   PORT=9000 node server.mjs
+//   node server.mjs            (default port 8090, this computer only; LISTEN=0.0.0.0 for your network)
 //
-// Endpoints:
-//   /                 channel guide page (also lets you watch in VLC)
-//   /channels.json    channel list used by the MiSTer player
-//   /now.json         what is on every channel right now
-//   /tune/<dial>.ts   continuous live MPEG-TS stream of one channel
+// Endpoints: /tv/ (the TV interface), /api/* (its data), /tune/<dial>.ts (a channel's stream),
+// /iptv/p (IPTV proxy), /quit (used by the desktop app).
 
 import http from 'node:http';
 import { spawn, spawnSync } from 'node:child_process';
@@ -36,16 +32,11 @@ const CFG = {
   width: Number(process.env.WIDTH || 320),
   height: Number(process.env.HEIGHT || 240),
   fps: process.env.FPS || '30000/1001',
-  videoQuality: process.env.VQ || '5',          // mpeg2 -q:v, lower = better/bigger
-  // Stream ceiling. 1800 kbit/s is plenty for 240p on a CRT and easy on Wi-Fi; raise it
-  // (MAXRATE=2500) on a wired network, or lower it (MAXRATE=1200) if Wi-Fi still stutters.
-  maxKbps: Number(process.env.MAXRATE || 1800),
   denoise: process.env.DENOISE !== '0',
   // Prefer archive.org's small 512Kb copies (SOURCES=small) for a slow internet connection.
   smallSources: (process.env.SOURCES || '').toLowerCase() === 'small',
   sourceKbps: Number(process.env.SOURCE_KBPS || 2500),
   leadSeconds: Number(process.env.LEAD || 8),   // start the next program this early, so a slow archive.org start doesn't freeze the picture
-  bannerSeconds: Number(process.env.BANNER || 5),
   // Loudness every show, ad and station break is brought to (LUFS). NORMALIZE=0 turns it off.
   loudness: Number(process.env.LOUDNESS || -20),
   normalize: process.env.NORMALIZE !== '0',
@@ -62,13 +53,13 @@ const CFG = {
   cacheDir: process.env.OOMPAS_CACHE || path.join(HERE, 'oompas-cache'),
   musicDir: process.env.MUSIC_DIR || path.join(HERE, 'music'),
   spelunkr: process.env.SPELUNKR !== '0',
-  guideStyle: process.env.GUIDE_STYLE || 'dream',      // 'classic' = the black-and-rainbow guide
   // Picture framing. BARS=0 stops trimming black bars that are baked into a video.
   // WIDESCREEN: fit = show all of a widescreen picture (bars top and bottom),
   // zoom = trim the sides a little (thinner bars), fill = fill the 4:3 screen.
+  listen: process.env.LISTEN || '127.0.0.1',
   bars: process.env.BARS !== '0',
   widescreen: ['fit', 'zoom', 'fill'].includes((process.env.WIDESCREEN || '').toLowerCase()) ? process.env.WIDESCREEN.toLowerCase() : 'fit',
-  // Set by the OOMPAS Server app, so it can shut the server down cleanly.
+  // Set by the desktop app, so it can shut the server down cleanly.
   appToken: process.env.OOMPAS_APP_TOKEN || '',
 };
 
@@ -177,7 +168,7 @@ class Broadcast {
       if (!this.oompas) throw e;
       if (now() - (this.spWarnAt || 0) > 600000) { log('Spelunkr channels unavailable: ' + e.message); this.spWarnAt = now(); }
     }
-    if (this.merged && this.mergedFrom === sp.channels) return this.withIptv(this.merged);
+    if (this.merged && this.mergedFrom === sp.channels) return this.merged;
     const off = Number(this.oompas?.config.spelunkrDialOffset ?? 100);
     const ours = (this.oompas?.channels || []).map((c, i) => {
       const m = c.kind === 'mirror'
@@ -192,22 +183,7 @@ class Broadcast {
       .filter(c => !taken.has(c.dial));
     this.merged = { channels: [...ours, ...theirs].sort((a, b) => a.dial - b.dial) };
     this.mergedFrom = sp.channels;
-    return this.withIptv(this.merged);
-  }
-
-  // IPTV channels go on the dial too (Settings: "show IPTV on the MiSTer").
-  withIptv(merged) {
-    const iptv = this.iptv;
-    if (!iptv?.channels.length || iptv.settings.onMister === false) return merged;
-    const starred = iptv.settings.onMister === 'starred';
-    const favKey = starred ? SETTINGS.favorites.join('|') : '';
-    if (this.iptvFor === merged && this.iptvList === iptv.channels && this.iptvFav === favKey) return this.iptvMerged;
-    const taken = new Set(merged.channels.map(c => c.dial));
-    const fav = new Set(SETTINGS.favorites);
-    const extra = iptv.channels.filter(c => !taken.has(c.dial) && (!starred || fav.has(c.id)));
-    this.iptvMerged = { channels: [...merged.channels, ...extra].sort((a, b) => a.dial - b.dial) };
-    this.iptvFor = merged; this.iptvList = iptv.channels; this.iptvFav = favKey;
-    return this.iptvMerged;
+    return this.merged;
   }
 
   async channelByDial(dial) {
@@ -509,10 +485,10 @@ function setupFfmpeg() {
   const f = spawnSync(CFG.ffmpeg, ['-hide_banner', '-filters'], { encoding: 'utf8' });
   if (!/drawtext/.test(f.stdout || '')) log('Note: this ffmpeg has no drawtext filter; channel banners and station-break text are disabled.');
   CFG.drawtext = /drawtext/.test(f.stdout || '');
-  // For the Groovy sender (?quality=high): x264 in 4:4:4 keeps full colour detail, so
-  // text on cards and bumpers stays crisp instead of bleeding at the edges.
+  // The app plays H.264, so this ffmpeg must have x264 (the bundled one does).
   const enc = spawnSync(CFG.ffmpeg, ['-hide_banner', '-encoders'], { encoding: 'utf8' });
   CFG.x264 = /libx264/.test(enc.stdout || '');
+  if (!CFG.x264) throw new Error('This ffmpeg has no x264 (H.264) encoder, which OOMPAS Box needs. Use a full ffmpeg build.');
   fs.writeFileSync(path.join(WORK, 'probe_fg.txt'), 'null');
   const probe = spawnSync(CFG.ffmpeg, ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'nullsrc=s=16x16:d=0.1', '-/vf', 'probe_fg.txt', '-f', 'null', '-'],
                           { cwd: WORK, encoding: 'utf8' });
@@ -568,15 +544,6 @@ function wrap(text, width = 24) {
 
 const hex = c => /^#?[0-9a-f]{6}$/i.test(c || '') ? '0x' + c.replace('#', '') : '0x1a1240';
 
-
-// Picture adjustments from the viewer (see spelunkr.ini): size in percent, position in
-// 240-line pixels, brightness/contrast/saturation. Applied as the last step, so the
-// banner and guide move and shrink with the picture.
-function pictureParams(sp) {
-  const num = (k, d, lo, hi) => { const v = Number(sp.get(k)); return sp.has(k) && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d; };
-  return { pw: num('pw', 100, 50, 100), ph: num('ph', 100, 50, 100), px: num('px', 0, -80, 80), py: num('py', 0, -60, 60),
-           br: num('br', 0, -100, 100), ct: num('ct', 100, 0, 300), sat: num('sat', 100, 0, 300) };
-}
 
 function finalTransform(W, H, OW, OH, pic, padColor = 'black') {
   const p = pic || {};
@@ -741,7 +708,7 @@ function segmentArgs(plan, tsOffset, banner, size) {
     vchain = gs.vchain; achain = gs.achain;
   } else if (plan.kind === 'media') {
     a.push('-re');
-    // On tuning in, send 10 s ahead so the MiSTer has a reserve to ride out slow patches.
+    // On tuning in, send 10 s ahead so the player has a reserve to ride out slow patches.
     if (BURST) a.push('-readrate_initial_burst', banner || plan.burst ? '10' : '0');
     if (/^https?:/i.test(plan.url)) {
       a.push('-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '10', '-rw_timeout', '20000000');
@@ -752,14 +719,14 @@ function segmentArgs(plan, tsOffset, banner, size) {
     vchain = `[0:v]${mediaFit(plan.url, W, H)},setsar=1,fps=${CFG.fps}` +
              // Tape grain changes every frame and eats bitrate; a light clean-up roughly
              // halves the stream with no visible loss on a CRT.
-             (CFG.denoise && !size?.hq && !size?.app ? ',hqdn3d=1.5:1.5:4:4' : '') + ',format=yuv420p';
+             (CFG.denoise && size?.denoise ? ',hqdn3d=1.5:1.5:4:4' : '') + ',format=yuv420p';
     // Mix with silence so every segment has an audio track even if the tape has none.
     // (A video with no sound track at all, like some silent films, just gets the silence.)
     const silent = FRAMING[framingKey(plan.url)]?.audio === false;
     achain = silent ? `[1:a]anull[a]`
       : `[0:a]aresample=48000,aformat=channel_layouts=stereo${LEVEL()}[ma];[ma][1:a]amix=inputs=2:duration=longest:normalize=0[a]`;
   } else if (plan.kind === 'live') {
-    // IPTV: transcode the live stream for the MiSTer (or the Groovy sender).
+    // IPTV: a live stream, transcoded (used when the app can't play the stream directly).
     if (/^https?:/i.test(plan.url)) a.push('-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '10', '-rw_timeout', '20000000');
     if (plan.ua) a.push('-user_agent', plan.ua);
     if (plan.referrer) a.push('-headers', `Referer: ${plan.referrer}\r\n`);
@@ -798,29 +765,11 @@ function segmentArgs(plan, tsOffset, banner, size) {
     }
   }
 
-  // The channel banner on tune-in (when the MiSTer can't lay it over the picture itself):
-  // the same themed banner, pre-drawn by renderBanner, shown for the first few seconds.
-  let bannerIn = -1;
-  if (banner?.png && !size?.audioOnly) { bannerIn = a.filter(x => x === '-i').length; a.push('-i', banner.png); }
-  vchain += finalTransform(W, H, OW, OH, size?.pic);
-  if (bannerIn >= 0) vchain += `[vb];[${bannerIn}:v]format=rgba[bn];[vb][bn]overlay=0:0:enable='lt(t,${CFG.bannerSeconds})'` + (size?.studio ? ':format=yuv444' : '');
-  if (size?.studio) vchain = vchain.replaceAll('format=yuv420p', CFG.x264 ? 'format=yuv444p' : 'format=yuv422p');
-  vchain += '[v]';
-
-  if (size?.audioOnly) a.push(...filterOpt('filter_complex', achain, files), '-map', '[a]', '-t', dur);
-  else {
-    a.push(...filterOpt('filter_complex', `${vchain};${achain}`, files), '-map', '[v]', '-map', '[a]', '-t', dur);
-    // ?quality=high (the Groovy sender, which decodes on this same PC, so size doesn't
-    // matter): near-lossless, no grain clean-up.
-    if (size?.app) a.push('-c:v', 'libx264', '-preset', 'veryfast', '-crf', '19', '-maxrate', '6000k', '-bufsize', '6000k',
-                          '-pix_fmt', 'yuv420p', '-profile:v', 'high', '-g', '60', '-keyint_min', '30', '-bf', '2');
-    else if (size?.studio && CFG.x264) a.push('-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'zerolatency', '-crf', '4', '-pix_fmt', 'yuv444p', '-g', '15');
-    else if (size?.studio) a.push('-c:v', 'mpeg2video', '-q:v', '2', '-pix_fmt', 'yuv422p', '-maxrate', '8000k', '-bufsize', '4000k', '-g', '15', '-bf', '0');
-    else if (size?.hq) a.push('-c:v', 'mpeg2video', '-q:v', '2', '-maxrate', '6000k', '-bufsize', '3000k', '-g', '15', '-bf', '0');
-    else a.push('-c:v', 'mpeg2video', '-q:v', CFG.videoQuality, '-maxrate', `${CFG.maxKbps}k`, '-bufsize', `${Math.round(CFG.maxKbps / 2)}k`, '-g', '15', '-bf', '0');
-  }
-  if (size?.app) a.push('-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '2');
-  else a.push('-c:a', 'mp2', '-b:a', size?.hq ? '256k' : '128k', '-ar', '48000', '-ac', '2');
+  vchain += finalTransform(W, H, OW, OH) + '[v]';
+  a.push(...filterOpt('filter_complex', `${vchain};${achain}`, files), '-map', '[v]', '-map', '[a]', '-t', dur);
+  a.push('-c:v', 'libx264', '-preset', 'veryfast', '-crf', '19', '-maxrate', '6000k', '-bufsize', '6000k',
+         '-pix_fmt', 'yuv420p', '-profile:v', 'high', '-g', '60', '-keyint_min', '30', '-bf', '2');
+  a.push('-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '2');
   a.push('-f', 'mpegts', '-mpegts_service_id', '1', '-mpegts_pmt_start_pid', '4096', '-mpegts_start_pid', '256',
          '-output_ts_offset', tsOffset.toFixed(3), '-muxdelay', '0', '-muxpreload', '0', 'pipe:1');
   return { args: a, files };
@@ -914,14 +863,8 @@ async function programsBetween(bc, channel, from, until) {
 // OOMPAS BOX guide: classic cable listings layout, black with rainbow accents.
 // Top left: what's on the highlighted channel. Top right: a picture of the channel
 // you're watching. Below: two-line grid rows. Designed on a 320x240 canvas.
-const PIP = { x: 196, y: 6, w: 112, h: 84 };
-const G = { BG: '0x000000', PANEL: '0x0a0a0a', CHAN: '0x0f0f0f', CELL: '0x161616', LIVE: '0x222222',
-            LINE: '0x333333', TEXT: 'white', DIM: '0x8e8e93', INK: '0x000000' };
-
 const fmtShort = ms => { const d = new Date(ms); const h = d.getHours() % 12 || 12;
                          return `${h}:${String(d.getMinutes()).padStart(2, '0')}${d.getHours() < 12 ? 'a' : 'p'}`; };
-// Mix a 0xRRGGBB colour toward black: share = how much of the colour remains.
-const dim = (c, share) => '0x' + [0, 2, 4].map(i => Math.round(parseInt(c.slice(2 + i, 4 + i), 16) * share).toString(16).padStart(2, '0')).join('');
 // Cable-style call sign, 3-4 letters: "COMPUTER CHRONICLES" -> "CMCH",
 // "LATE NIGHT LOUNGE" -> "LNL", "CARTOONS" -> "CRTN".
 const squash = w => (w[0] + w.slice(1).replace(/[AEIOU]/g, '')).replace(/(.)\1+/g, '$1');
@@ -965,16 +908,6 @@ function painter(k) {
 }
 
 // RGBA bytes -> PNG (for previewing the banner in a browser).
-function rgbaToPng(buf, w, h) {
-  return new Promise((resolve, reject) => {
-    const p = spawn(CFG.ffmpeg, ['-hide_banner', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${w}x${h}`, '-i', 'pipe:0',
-                                 '-frames:v', '1', '-f', 'image2pipe', '-vcodec', 'png', 'pipe:1'], { windowsHide: true });
-    const out = []; p.stdout.on('data', d => out.push(d));
-    p.on('close', code => code === 0 ? resolve(Buffer.concat(out)) : reject(new Error('png failed')));
-    p.stdin.end(buf);
-  });
-}
-
 function renderFrame(p, W, H, bg, outW, outH, format, pic, canvasOnly, image) {
   const clear = bg === 'transparent';
   const tail = canvasOnly ? '' : finalTransform(W, H, outW, outH, pic, clear ? 'black@0' : 'black');
@@ -999,333 +932,6 @@ function renderFrame(p, W, H, bg, outW, outH, format, pic, canvasOnly, image) {
       code === 0 ? resolve(Buffer.concat(chunks)) : reject(new Error('render failed: ' + err.trim().split('\n').pop()));
     });
   });
-}
-
-async function renderGuide(bc, selDial, outW, outH, format, pic, opts = {}) {
-  if (!CFG.drawtext) throw new Error('The guide needs an ffmpeg with the drawtext filter');
-  const lineup = await bc.lineup();
-  const chans = [...lineup.channels, { settings: true, dial: '', name: 'SETUP',
-                                       description: 'Adjust the size, position, brightness and colour of the picture.' }];
-  let sel = selDial === 'settings' ? chans.length - 1 : chans.findIndex(c => String(c.dial) === String(selDial));
-  if (sel < 0) sel = 0;
-  const at = now();
-  const tint = i => RAINBOW[i % 7];
-
-  const H = opts.canvasOnly ? 240 : outH, W = Math.round(H * 4 / 3 / 2) * 2;
-  const P = painter(H / 240);
-  const { text, box, fit } = P;
-  const L = UI.line;
-  const c = chans[sel], accent = tint(sel);
-
-  // --- top left: info panel ------------------------------------------------------
-  box(12, 6, 176, 86, G.PANEL);
-  box(12, 6, 176, 15, G.BG);
-  P.logo('OOMPAS BOX', 16, 10);
-  text(fmtShort(at).replace(/([ap])$/, '$1m'), `${P.px(186)}-text_w`, 8, 'body', G.TEXT);
-  P.rainbow(12, 21, 176, 2);
-
-  text(P.clipW(c.settings ? 'SETUP' : `${c.dial}  ${String(c.name).toUpperCase()}`, 168), 16, 25, 'body', accent);
-  let progs = [];
-  if (!c.settings) { try { progs = (await programsBetween(bc, await bc.channel(c.id), at, at + 4 * 3600000)).slice(0, 2); } catch {} }
-  const cur = progs[0];
-  text(P.clipW(c.settings ? 'Picture settings' : cur ? cur.title : 'Off the air', cur && cur.year ? 168 - textPx(String(cur.year)) - 8 : 168), 16, 25 + L + 1, 'body', G.TEXT);
-  const ty = 25 + 2 * (L + 1);
-  if (cur) {
-    text(`${fmtShort(cur.startMs)} - ${fmtShort(cur.endMs)}`, 16, ty, 'body', G.TEXT);
-    if (cur.year) text(String(cur.year), `${P.px(184)}-text_w`, ty, 'body', G.DIM);
-    const frac = Math.max(0, Math.min(1, (at - cur.startMs) / Math.max(1, cur.endMs - cur.startMs)));
-    box(16, ty + L + 1, 168, 2, G.LIVE);
-    box(16, ty + L + 1, Math.round(168 * frac), 2, accent);
-  }
-  const desc = c.settings ? c.description
-    : [kindLine(cur), nowLine(cur, at), progs[1] ? `Next: ${progs[1].title}` : c.description].filter(Boolean).join('. ');
-  const dy = ty + L + 5, keep = Math.max(1, Math.floor((92 - dy) / L));
-  if (desc) P.lines(P.wrapW(desc, 168, keep), 16, dy, G.DIM);
-
-  // --- top right: picture ---------------------------------------------------------
-  box(PIP.x - 2, PIP.y - 2, PIP.w + 4, PIP.h + 4, accent);
-  box(PIP.x, PIP.y, PIP.w, PIP.h, G.BG);
-  const snap = opts.snapshot && fs.existsSync(path.join(WORK, opts.snapshot)) ? opts.snapshot : null;
-  if (!snap) text('TUNING…', PIP.x + 28, PIP.y + 36, 'body', G.DIM);
-
-  // --- grid ----------------------------------------------------------------------
-  const SLOT = 1800000, COLS = 3, winStart = Math.floor(at / SLOT) * SLOT, winEnd = winStart + COLS * SLOT;
-  const cx = 12, cw = 34, gx0 = cx + cw + 1, gx1 = 308, gw = gx1 - gx0;
-  const xOf = ms => gx0 + Math.round((Math.max(winStart, Math.min(winEnd, ms)) - winStart) / (winEnd - winStart) * gw);
-  const top = 96, headH = L + 2, rowH = 2 * L + 1, rowsTop = top + headH + 2;
-  const ROWS = Math.max(2, Math.floor((224 - rowsTop) / (rowH + 1)));
-
-  text(new Date(at).getHours() >= 17 ? 'Tonight' : 'Today', cx + 2, top + 1, 'body', G.DIM);
-  for (let i = 0; i < COLS; i++) text(fmtShort(winStart + i * SLOT), xOf(winStart + i * SLOT) + 4, top + 1, 'body', G.TEXT);
-  box(cx, top + headH, 296, 1, G.LINE);
-
-  const first = Math.max(0, Math.min(sel - 1, chans.length - ROWS));
-  const rows = chans.slice(first, first + ROWS);
-  const grids = await Promise.all(rows.map(async ch => {
-    if (ch.settings) return null;
-    try { return await programsBetween(bc, await bc.channel(ch.id), winStart, winEnd); } catch { return []; }
-  }));
-  // up to two lines in a cell; a single line is centred vertically
-  // Text stays within the cell and, in a very wide cell (a show filling the row),
-  // within about half the grid so the title reads as a compact block.
-  const TEXT_MAX = 150;
-  const cellText = (t, x, y, w, color) => {
-    const two = wrapPx(t, Math.min(w - 6, TEXT_MAX), 2);
-    const yy = two.length === 1 ? y + Math.floor((rowH - L) / 2) : y;
-    two.forEach((ln, i) => text(ln, x + 3, yy + i * L, 'body', color));
-  };
-  rows.forEach((ch, i) => {
-    const idx = first + i, y = rowsTop + i * (rowH + 1), isSel = idx === sel, col = tint(idx);
-    const cc = `${P.px(cx + 2 + (cw - 2) / 2)}-text_w/2`, ink = isSel ? G.INK : G.TEXT;
-    box(cx, y, cw, rowH, isSel ? col : G.CHAN);
-    box(cx, y, 3, rowH, col);
-    if (ch.settings) text('SET', cc, y + Math.floor((rowH - L) / 2), 'body', ink);
-    else { text(String(ch.dial), cc, y, 'body', ink); text(ch.call || callSign(ch.name), cc, y + L, 'body', ink); }
-    const rowBg = isSel ? dim(col, 0.22) : G.CELL;
-    if (ch.settings) {
-      box(gx0, y, gw, rowH, isSel ? col : G.CELL);
-      cellText('Picture settings', gx0, y, gw, isSel ? G.INK : G.TEXT);
-      return;
-    }
-    const progs = grids[i] || [];
-    if (!progs.length) { box(gx0, y, gw, rowH, rowBg); cellText('Off the air', gx0, y, gw, G.DIM); return; }
-    const later = [];
-    progs.forEach(p => {
-      const x0 = xOf(p.startMs), x1 = xOf(p.endMs), w = x1 - x0 - 1;
-      if (w < 3) return;
-      const live = p.startMs <= at && p.endMs > at, focus = isSel && live;
-      box(x0, y, w, rowH, focus ? col : live && !isSel ? G.LIVE : rowBg);
-      if (w - 6 >= textPx('Ab…')) later.push(() => cellText(p.title, x0, y, w, focus ? G.INK : G.TEXT));
-    });
-    later.forEach(f => f());
-  });
-  P.rainbow(cx, rowsTop + ROWS * (rowH + 1) + 1, 296, 2);
-
-  const image = snap ? { file: snap, x: P.px(PIP.x), y: P.px(PIP.y), w: P.px(PIP.w), h: P.px(PIP.h) } : null;
-  return renderFrame(P, W, H, G.BG, outW, outH, format, pic, opts.canvasOnly, image);
-}
-
-
-// The browser guide in the Guide channel's style: the sky behind, display fonts on top,
-// Prevue-style rows below. Same controls and layout as the classic one.
-async function renderGuideVapor(bc, selDial, outW, outH, format, pic, opts = {}) {
-  if (!CFG.drawtext) throw new Error('The guide needs an ffmpeg with the drawtext filter');
-  const lineup = await bc.lineup();
-  const chans = [...lineup.channels, { settings: true, dial: '', name: 'SETUP', call: 'SET',
-                                       description: 'Adjust the size, position, brightness and colour of the picture.' }];
-  let sel = selDial === 'settings' ? chans.length - 1 : chans.findIndex(c => String(c.dial) === String(selDial));
-  if (sel < 0) sel = 0;
-  const at = now();
-  const H = outH, W = Math.round(H * 4 / 3 / 2) * 2, k = H / 240;
-  const P = painter(k);
-  const { text, box } = P;
-  const L = UI.line;
-  const PINK = '0xc6f4ef', CYAN = '0xa8f0ec', LILAC = '0xd9f3f5', GOLD = '0xfff3b0';
-  const fxText = (t, font, size, color, x, y, extra = '') => {
-    const f = textFile(t); P.files.push(f);
-    P.parts.push(`drawtext=fontfile=${font}:expansion=none:textfile=${f}:fontsize=${Math.round(size * k)}:fontcolor=${color}:` +
-                 `x=${typeof x === 'number' ? P.px(x) : x}:y=${typeof y === 'number' ? P.px(y) : y}${extra}`);
-  };
-  const glow = `:shadowcolor=0x0b3640@0.75:shadowx=${Math.max(1, Math.round(2 * k))}:shadowy=${Math.max(1, Math.round(2 * k))}`;
-  const c = chans[sel], tint = i => PASTEL[i % 7];
-
-  // --- top left: logo, clock, what's on ------------------------------------------------
-  fxText(opts.logo || 'OOMPAS BOX', fx(opts.logoFont || 'shrikhand'), 18, '0xffffff', 12, 6, glow);
-  fxText(fmtShort(at).toUpperCase(), fx('vt323'), 18, '0x0e4a57', `${P.px(188)}-text_w`, 8);
-  box(12, 34, 176, 63, '0x0e4a57@0.62');
-  box(12, 34, 176, 2, PINK);
-  let progs = [];
-  if (!c.settings) { try { progs = (await programsBetween(bc, await bc.channel(c.id), at, at + 4 * 3600000)).slice(0, 2); } catch {} }
-  const cur = progs[0];
-  const nm = c.settings ? 'SETUP' : `${c.dial}  ${String(c.name).toUpperCase()}`;
-  fxText(nm.length > 18 ? nm.slice(0, 17).trimEnd() + '\u2026' : nm, fx('michroma'), 9, PINK, 17, 39);
-  if (cur) {   // block name on the left, time slot on the right (VT323 is about 5.3 px a letter at 14, 5 at 12)
-    const when = `${fmtShort(cur.startMs).toUpperCase()}-${fmtShort(cur.endMs).toUpperCase()}`;
-    fxText(when, fx('vt323'), 12, GOLD, `${P.px(183)}-text_w`, 51);
-    const room = Math.floor((166 - when.length * 5 - 8) / 5.3);
-    fxText(shorten(((cur.isBlock ? cur.category : cur.block) || cur.category || '').toUpperCase(), room), fx('vt323'), 14, CYAN, 17, 49);
-  }
-  const title = c.settings ? 'Picture settings' : cur ? cur.title : 'Off the air';
-  const detail = c.settings ? '' : nowLine(cur, at) || aboutLine(cur, at) || [cur?.category, cur?.year].filter(Boolean).join(' \u00b7 ');
-  P.lines(wrapPx(title, 166, detail ? 1 : 2), 17, 61, 'white');
-  if (detail) P.lines(wrapPx(detail, 166, 1), 17, 71, LILAC);
-  if (cur) {
-    const frac = Math.max(0, Math.min(1, (at - cur.startMs) / Math.max(1, cur.endMs - cur.startMs)));
-    box(17, 82, 166, 2, '0x3d8a96'); box(17, 82, Math.round(166 * frac), 2, PINK);
-  }
-  const desc = c.settings ? c.description : progs[1] ? `Next: ${progs[1].title}` : (c.description || '');
-  if (desc) P.lines(wrapPx(desc, 166, 1), 17, 85, LILAC);
-
-  // --- top right: picture --------------------------------------------------------------
-  box(PIP.x - 2, PIP.y - 2, PIP.w + 4, PIP.h + 4, PINK);
-  box(PIP.x, PIP.y, PIP.w, PIP.h, '0x0e4a57');
-  const snap = opts.snapshot && fs.existsSync(path.join(WORK, opts.snapshot)) ? opts.snapshot : null;
-  if (!snap) fxText('tuning', fx('majormono'), 10, LILAC, `${P.px(PIP.x + PIP.w / 2)}-text_w/2`, PIP.y + 38);
-
-  // --- info view (Left in the guide): everything about the highlighted program ----------
-  if (opts.info && !c.settings) {
-    const all = await (async () => { try { return await programsBetween(bc, await bc.channel(c.id), at, at + 6 * 3600000); } catch { return []; } })();
-    const p0 = all[0];
-    box(12, 98, 296, 128, `${kindColour(p0, false)}@0.94`);
-    box(12, 98, 296, 2, PINK);
-    fxText('PROGRAM INFO', fx('vt323'), 14, CYAN, 18, 101);
-    fxText('LEFT: back to listings', fx('vt323'), 12, '0xd9f3f5', `${P.px(302)}-text_w`, 103);
-    text(clipPx(p0 ? p0.title : 'Off the air', 284, UI.big), 18, 115, 'big', 'white');
-    if (p0) {
-      const slot = `${fmtShort(p0.startMs).toUpperCase()}-${fmtShort(p0.endMs).toUpperCase()}`;
-      fxText(shorten([slot, p0.isBlock ? p0.category : p0.block].filter(Boolean).join('  ·  ').toUpperCase(), 52), fx('vt323'), 14, GOLD, 18, 138);
-      const kind = [p0.isBlock ? '' : p0.category, p0.year, p0.eps?.length > 1 && !p0.isBlock ? `${p0.eps.length} episodes` : ''].filter(Boolean).join(' · ');
-      if (kind) P.lines(wrapPx(kind, 284, 1), 18, 153, LILAC);
-      const nowL = nowLine(p0, at);
-      if (nowL) P.lines(wrapPx(nowL, 284, 2), 18, 164, 'white');
-    }
-    const later = all.slice(1, 4).map(p => `${fmtShort(p.startMs)}  ${p.title}`);
-    if (later.length) { P.lines([`Next: ${later[0]}`], 18, 187, '0xc6f4ef'); if (later[1]) P.lines([`Then: ${later[1]}`], 18, 198, '0xc6f4ef'); }
-    const about = aboutLine(p0, at) || c.description;
-    if (about) P.lines(wrapPx(about, 284, 1), 18, 211, LILAC);
-    const image = snap ? { file: snap, x: P.px(PIP.x), y: P.px(PIP.y), w: P.px(PIP.w), h: P.px(PIP.h) } : null;
-    const bgFile = fs.existsSync(path.join(WORK, 'gen_guidebg.png')) ? { file: 'gen_guidebg.png' } : '0x0e4a57';
-    return renderFrame(P, W, H, bgFile, outW, outH, format, pic, false, image);
-  }
-
-  // --- grid ----------------------------------------------------------------------------
-  const SLOT = 1800000, COLS = 3, winStart = Math.floor(at / SLOT) * SLOT, winEnd = winStart + COLS * SLOT;
-  const cx = 12, cw = 36, gx0 = cx + cw + 1, gx1 = 308, gw = gx1 - gx0;
-  const xOf = ms => gx0 + Math.round((Math.max(winStart, Math.min(winEnd, ms)) - winStart) / (winEnd - winStart) * gw);
-  const top = 98, rowH = 2 * L + 1, rowsTop = top + 15;
-  const ROWS = Math.max(2, Math.floor((226 - rowsTop) / (rowH + 1)));
-  box(0, top, 320, 13, '0x0b3640@0.85');
-  PASTEL.forEach((col, i) => box(Math.round(i * 320 / 7), top + 13, Math.round((i + 1) * 320 / 7) - Math.round(i * 320 / 7), 1, col));
-  fxText(new Date(at).getHours() >= 17 ? 'TONIGHT' : 'TODAY', fx('vt323'), 14, PINK, cx, top);
-  for (let i = 0; i < COLS; i++) fxText(fmtShort(winStart + i * SLOT).toUpperCase(), fx('vt323'), 14, 'white', xOf(winStart + i * SLOT) + 3, top);
-
-  const first = Math.max(0, Math.min(sel - 1, chans.length - ROWS));
-  const rows = chans.slice(first, first + ROWS);
-  const grids = await Promise.all(rows.map(async ch => {
-    if (ch.settings) return null;
-    try { return await programsBetween(bc, await bc.channel(ch.id), winStart, winEnd); } catch { return []; }
-  }));
-  const cellText = (t, x, y, w, color) => {
-    const two = wrapPx(t, Math.min(w - 6, 150), 2);
-    const yy = two.length === 1 ? y + Math.floor((rowH - L) / 2) : y;
-    two.forEach((ln, i) => text(ln, x + 3, yy + i * L, 'body', color));
-  };
-  rows.forEach((ch, i) => {
-    const idx = first + i, y = rowsTop + i * (rowH + 1), isSel = idx === sel, col = tint(idx);
-    const cc = `${P.px(cx + 2 + (cw - 2) / 2)}-text_w/2`;
-    box(cx, y, cw, rowH, isSel ? 'white' : col);
-    if (isSel) box(cx, y, 3, rowH, col);
-    const ink = '0x0e4a57';
-    if (ch.settings) text('SET', cc, y + Math.floor((rowH - L) / 2), 'body', ink);
-    else { text(String(ch.dial), cc, y, 'body', ink); text(ch.call || callSign(ch.name), cc, y + L, 'body', ink); }
-    const rowBg = isSel ? '0x2a8494@0.92' : i % 2 ? '0x1b6a78@0.88' : '0x145866@0.88';
-    if (ch.settings) { box(gx0, y, gw, rowH, isSel ? PINK : rowBg); cellText('Picture settings', gx0, y, gw, isSel ? '0x0e4a57' : 'white'); return; }
-    const pr = grids[i] || [];
-    if (!pr.length) { box(gx0, y, gw, rowH, rowBg); cellText(ch.oompas ? 'Finding tapes…' : 'Off the air', gx0, y, gw, LILAC); return; }
-    const later = [];
-    pr.forEach(p => {
-      const x0 = xOf(p.startMs), x1 = xOf(p.endMs), w = x1 - x0 - 1;
-      if (w < 3) return;
-      const live = p.startMs <= at && p.endMs > at, focus = isSel && live;
-      box(x0, y, w, rowH, focus ? PINK : `${kindColour(p, isSel)}@0.92`);
-      if (w >= 28) later.push(() => cellText(p.title, x0, y, w, focus ? '0x0e4a57' : 'white'));
-    });
-    later.forEach(f => f());
-  });
-  PASTEL.forEach((col, i) => box(cx + Math.round(i * 296 / 7), rowsTop + ROWS * (rowH + 1) + 1, Math.round((i + 1) * 296 / 7) - Math.round(i * 296 / 7), 1, col));
-
-  const image = snap ? { file: snap, x: P.px(PIP.x), y: P.px(PIP.y), w: P.px(PIP.w), h: P.px(PIP.h) } : null;
-  const bgFile = fs.existsSync(path.join(WORK, 'gen_guidebg.png')) ? { file: 'gen_guidebg.png' } : '0x0e4a57';
-  return renderFrame(P, W, H, bgFile, outW, outH, format, pic, false, image);
-}
-
-
-// The channel banner (Left while watching, and on tuning in). Drawn on a transparent
-// frame; the MiSTer lays it over the picture itself so it appears the moment you press.
-// Number, name and clock; the program and its time slot; and an info box below, blue
-// for shows and purple for movies, with the block, the episode and what's next.
-async function renderBanner(bc, dial, outW, outH, pic) {
-  if (!CFG.drawtext) throw new Error('The banner needs an ffmpeg with the drawtext filter');
-  const lineup = await bc.lineup();
-  const idx = Math.max(0, lineup.channels.findIndex(c => String(c.dial) === String(dial)));
-  const c = lineup.channels[idx];
-  const at = now();
-  let progs = [];
-  try { progs = await programsBetween(bc, await bc.channel(c.id), at, at + 4 * 3600000); } catch {}
-  const cur = progs[0], next = progs[1];
-  const H = outH, W = Math.round(H * 4 / 3 / 2) * 2, k = H / 240;
-  const P = painter(k);
-  const solid = (x, y, w, h, col) => P.parts.push(`drawbox=x=${P.px(x)}:y=${P.px(y)}:w=${P.px(w)}:h=${P.px(h)}:color=${col}:t=fill:replace=1`);
-  const fxText = (t, font, size, color, x, y) => {
-    const f = textFile(t); P.files.push(f);
-    P.parts.push(`drawtext=fontfile=${font}:expansion=none:textfile=${f}:fontsize=${Math.round(size * k)}:fontcolor=${color}:` +
-                 `x=${typeof x === 'number' ? P.px(x) : x}:y=${typeof y === 'number' ? P.px(y) : y}`);
-  };
-  const L = UI.line, x0 = 16, y0 = 144, bw = 288, bh = 84;
-  solid(x0, y0, bw, bh, '0x0e4a57@0.88');
-  solid(x0, y0, 4, bh, PASTEL[idx % 7]);
-  solid(x0 + 4, y0, bw - 4, 1, '0xc6f4ef@0.9');
-  // number, name, clock
-  const num = String(c.dial), numW = Math.round(textPx(num, UI.big));
-  P.text(num, x0 + 10, y0 + 4, 'big', 'white');
-  const name = String(c.name).toUpperCase();
-  P.text(clipPx(name, bw - 60 - numW), x0 + 10 + numW + 8, y0 + 10, 'body', PASTEL[idx % 7]);
-  fxText(fmtShort(at).toUpperCase(), fx('vt323'), 14, '0xfff3b0', `${P.px(x0 + bw - 8)}-text_w`, y0 + 6);
-  // program and time slot
-  const title = cur ? cur.title : c.oompas ? 'Finding tapes…' : 'Off the air';
-  const slot = cur ? `${fmtShort(cur.startMs).toUpperCase()}-${fmtShort(cur.endMs).toUpperCase()}` : '';
-  P.text(clipPx(title, bw - 22 - slot.length * 5 - 8), x0 + 10, y0 + 27, 'body', 'white');
-  if (slot) fxText(slot, fx('vt323'), 12, '0xa8f0ec', `${P.px(x0 + bw - 8)}-text_w`, y0 + 28);
-  // info box
-  const ix = x0 + 8, iy = y0 + 41, iw = bw - 14, ih = 38;
-  solid(ix, iy, iw, ih, `${kindColour(cur, false)}@0.95`);
-  const lines = [
-    [kindLine(cur) || c.description || '', '0xd9f3f5'],
-    [nowLine(cur, at) || aboutLine(cur, at) || (cur ? '' : c.description || ''), 'white'],
-    [next ? `Next: ${next.title}  ${fmtShort(next.startMs)}` : '', '0xc6f4ef'],
-  ].filter(l => l[0]);
-  lines.slice(0, 3).forEach(([t, col], i) => P.text(clipPx(t, iw - 10), ix + 5, iy + 3 + i * (L + 1), 'body', col));
-  return renderFrame(P, W, H, 'transparent', outW, outH, 'rgba', pic, false);
-}
-
-// ------------------------------------------------------- picture settings
-// Calibration screen: a border that marks the picture's edges, colour bars and a
-// grey ramp, with the settings menu in the middle. Drawn through the same final
-// transform as the video, so it shows exactly what the viewer will get.
-const SETTINGS_ROWS = [
-  ['Width', p => `${p.pw}%`], ['Height', p => `${p.ph}%`],
-  ['Left / right', p => `${p.px > 0 ? '+' : ''}${p.px}`], ['Up / down', p => `${p.py > 0 ? '+' : ''}${p.py}`],
-  ['Brightness', p => `${p.br > 0 ? '+' : ''}${p.br}`], ['Contrast', p => `${p.ct}%`], ['Colour', p => `${p.sat}%`],
-  ['Reset to defaults', () => ''], ['Done', () => ''],
-];
-
-async function renderSettings(sel, outW, outH, format, pic) {
-  if (!CFG.drawtext) throw new Error('Settings need an ffmpeg with the drawtext filter');
-  const H = outH, W = Math.round(H * 4 / 3 / 2) * 2;
-  const P = painter(H / 240);
-  const { text, box } = P;
-  const L = UI.line;
-
-  // Edge border with corner ticks: adjust until it's just visible on every side.
-  box(0, 0, 320, 240, 'white', 2);
-  for (const [x, y] of [[0, 0], [300, 0], [0, 220], [300, 220]]) box(x, y, 20, 20, 'white', 3);
-  ['white', 'yellow', 'cyan', 'green', 'magenta', 'red', 'blue', 'black'].forEach((c, i) => box(24 + i * 34, 10, 34, 18, c));
-  for (let i = 0; i < 8; i++) { const g = Math.round(i * 255 / 7).toString(16).padStart(2, '0'); box(24 + i * 34, 214, 34, 16, `0x${g}${g}${g}`); }
-  text('Show the white border on every side', '(w-text_w)/2', 33, 'body', G.TEXT);
-
-  box(60, 50, 200, 158, '0x000000');
-  P.logo('PICTURE', 160 - 28, 55);
-  P.rainbow(60, 66, 200, 2);
-  SETTINGS_ROWS.forEach(([label, val], i) => {
-    const y = 71 + i * (L + 2), on = i === sel;
-    if (on) box(64, y - 1, 192, L + 2, RAINBOW[i % 7]);
-    text(label, 70, y, 'body', on ? G.INK : G.TEXT);
-    const v = val(pic);
-    if (v) text((on ? '< ' : '') + v + (on ? ' >' : ''), `w-${P.px(70)}-text_w`, y, 'body', on ? G.INK : G.DIM);
-  });
-  text(sel <= 6 ? 'UP/DOWN pick   LEFT/RIGHT change' : 'RIGHT to select', '(w-text_w)/2', 71 + 9 * (L + 2) + 3, 'body', G.DIM);
-
-  return renderFrame(P, W, H, '0x1c1c1e', outW, outH, format, pic, false);
 }
 
 // ------------------------------------------------- Guide & Weather channels
@@ -1798,44 +1404,6 @@ async function setupTapeMusic(oompas) {
   }
 }
 
-// ------------------------------------------------------------ snapshots
-// A still of what's on a channel right now, for the guide's picture box. Grabbed in
-// the background and refreshed every few seconds while someone is looking.
-const snapshots = new Map();   // dial -> { file, at, busy }
-
-function snapshotFor(bc, dial) {
-  const key = String(dial);
-  let s = snapshots.get(key);
-  if (!s) { s = { file: null, at: 0, busy: false }; snapshots.set(key, s); }
-  if (!s.busy && now() - s.at > 4000) {
-    s.busy = true;
-    (async () => {
-      try {
-        const ch = await bc.channelByDial(key);
-        const plan = await bc.plan(ch, now());
-        const file = `snap_${key.replace(/\W/g, '')}_${(++fileSeq) % 2}.png`;
-        let args;
-        if (plan.kind === 'media') {
-          args = ['-hide_banner', '-loglevel', 'error', '-nostdin', '-ss', Math.max(0, plan.seek).toFixed(2), '-i', plan.url,
-                  '-frames:v', '1', '-vf', `scale=${PIP.w * 2}:${PIP.h * 2}:force_original_aspect_ratio=decrease,pad=${PIP.w * 2}:${PIP.h * 2}:(ow-iw)/2:(oh-ih)/2`, '-y', file];
-        } else if (plan.kind === 'gen') {
-          args = ['-hide_banner', '-loglevel', 'error', '-nostdin', '-i', `gen_still_${plan.gen}.png`, '-vf', `scale=${PIP.w * 2}:${PIP.h * 2}`, '-frames:v', '1', '-y', file];
-        } else {
-          args = ['-hide_banner', '-loglevel', 'error', '-nostdin', '-f', 'lavfi', '-i', `color=c=${hex(plan.color)}:s=${PIP.w * 2}x${PIP.h * 2}:d=1`, '-frames:v', '1', '-y', file];
-        }
-        const code = await new Promise(r => spawn(CFG.ffmpeg, args, { cwd: WORK, windowsHide: true }).on('close', r));
-        if (code === 0) {
-          const old = s.file; s.file = file;
-          if (old && old !== file) fs.rm(path.join(WORK, old), { force: true }, () => {});
-        }
-      } catch {}
-      s.at = now(); s.busy = false;
-    })();
-  }
-  return s.file;
-}
-
-
 // ----------------------------------------------------------- live stream
 let viewers = 0;
 // Open streams, so the log can say who is watching and stale duplicates can be closed.
@@ -1879,15 +1447,14 @@ async function streamChannel(bc, dial, req, res, size, opts = {}) {
   // One TV plays one channel. When a TV opens a new stream, any older stream to the
   // same address is left over (a re-tune, or a player that didn't hang up), and over
   // Wi-Fi the two fight for bandwidth and both stutter. Close the old one now.
-  // On this PC itself (VLC and the Groovy sender may both be open) only streams that
-  // name the same viewer (?viewer=groovy) replace each other.
+  // On this PC itself only streams that name the same viewer (the app) replace each other.
   const local = /^(127\.|::1$|localhost)/.test(me.addr);
   if (!local || me.viewer) {
     for (const o of STREAMS) if (o.addr === me.addr && o.viewer === me.viewer) { log(`  closing the earlier stream (${o.dial}) to ${me.viewer || o.addr}`); o.close(); }
   }
   STREAMS.add(me);
   viewers++;
-  const what = size?.audioOnly ? ' (sound only, for the guide)' : '';
+  const what = '';
   log(`+ ${me.addr} tuned to ${channel.dial} ${channel.name}${what} — ${watchingSummary()}`);
 
   let tsOffset = 1.0;
@@ -1896,18 +1463,7 @@ async function streamChannel(bc, dial, req, res, size, opts = {}) {
   let next = null;
 
   try {
-    const lineIdx = (await bc.lineup()).channels.findIndex(c => c.id === channel.id);
-    let banner = opts.nobanner ? null : { dial: channel.dial, name: channel.name, color: channel.color, accent: RAINBOW[Math.max(0, lineIdx) % 7] };
-    if (banner && CFG.drawtext && !size?.audioOnly) {
-      try {
-        const w = size?.w || CFG.width, h = size?.h || CFG.height;
-        const png = await rgbaToPng(await renderBanner(bc, channel.dial, w, h, size?.pic), w, h);
-        const file = `bn_${++fileSeq}.png`;
-        fs.writeFileSync(path.join(WORK, file), png);
-        banner.png = file;
-        setTimeout(() => fs.rm(path.join(WORK, file), { force: true }, () => {}), 120000).unref();
-      } catch (e) { log('  banner: ' + e.message); }
-    }
+    let banner = { first: true };   // the first segment after tuning in pre-loads a reserve
     while (!closed) {
       let seg = next; next = null;
       if (!seg) {
@@ -1923,7 +1479,7 @@ async function streamChannel(bc, dial, req, res, size, opts = {}) {
       const plan = seg.plan;
       // Which copy of the tape is playing, and at what quality, so a soft picture can be traced.
       const src = plan.kind === 'media' && plan.url ? ` · ${decodeURIComponent(String(plan.url).split('/').pop())}` : '';
-      log(`  ${channel.dial} ${plan.kind === 'media' || plan.kind === 'live' ? '▶' : '■'} ${plan.title} [${Math.round(plan.dur)}s]${src}${size?.app ? ' · app (H.264)' : size?.studio ? ` · high quality (${CFG.x264 ? 'x264 4:4:4' : 'MPEG-2 4:2:2'})` : size?.hq ? ' · high quality (MPEG-2)' : ''}`);
+      log(`  ${channel.dial} ${plan.kind === 'media' || plan.kind === 'live' ? '▶' : '■'} ${plan.title} [${Math.round(plan.dur)}s]${src}`);
 
       // Arrange to start the following program a little before this one ends.
       // Timed from the schedule (not from when this segment began: on tune-in it is sent
@@ -1990,11 +1546,6 @@ async function streamChannel(bc, dial, req, res, size, opts = {}) {
 }
 
 // ------------------------------------------------------------ HTTP server
-function lanAddresses() {
-  return Object.values(os.networkInterfaces()).flat()
-    .filter(i => i && i.family === 'IPv4' && !i.internal).map(i => i.address);
-}
-
 // ------------------------------------------------------------ app settings + API
 // Settings changed in the TV app are kept in settings.json (in the app's data folder,
 // or oompas-cache), so the desktop app and a future TV-box app share them.
@@ -2002,7 +1553,7 @@ const APP_DATA = process.env.APP_DATA || CFG.cacheDir;
 const SETTINGS_FILE = path.join(APP_DATA, 'settings.json');
 const SETTINGS = {
   widescreen: CFG.widescreen, bars: CFG.bars, crt: true, banner: true, volume: 0.8, lastDial: null,
-  iptv: { enabled: false, onMister: true, dialStart: 500, hideAdult: true, hideBroken: false, countries: [], languages: [], categories: [], lists: [] },
+  iptv: { enabled: false, dialStart: 500, hideAdult: true, hideBroken: false, countries: [], languages: [], categories: [], lists: [] },
   favorites: [],        // starred channel ids: "My channels"
   zoom: 'trim',         // picture shape in the app: fit, trim (zoom past black bars), fill, stretch
   zoomByChannel: {},
@@ -2044,9 +1595,8 @@ function mergeSettings(patch) {
   if (['free', '1', '2', '3', '640x480', '800x600', '960x720', '1024x768', '1280x960'].includes(String(p.windowScale))) SETTINGS.windowScale = String(p.windowScale);
   if (p.iptv && typeof p.iptv === 'object') {
     const i = p.iptv, cur = SETTINGS.iptv;
-    for (const k of ['enabled', 'onMister', 'hideAdult', 'hideBroken']) if (typeof i[k] === 'boolean') cur[k] = i[k];
+    for (const k of ['enabled', 'hideAdult', 'hideBroken']) if (typeof i[k] === 'boolean') cur[k] = i[k];
     if (Array.isArray(i.languages)) cur.languages = i.languages.map(x => String(x).slice(0, 60)).filter(Boolean).slice(0, 100);
-    if (i.onMister === 'starred') cur.onMister = 'starred';
     if (Array.isArray(i.categories)) cur.categories = i.categories.map(x => String(x).slice(0, 60)).filter(Boolean).slice(0, 200);
     if (Array.isArray(i.countries)) cur.countries = i.countries.map(x => String(x).toLowerCase()).filter(x => /^[a-z?]{1,2}$/.test(x)).slice(0, 250);
     if (Number.isFinite(+i.dialStart) && +i.dialStart >= 1 && +i.dialStart <= 9000) cur.dialStart = Math.round(+i.dialStart);
@@ -2078,7 +1628,7 @@ function sectionOf(c) {
   return { kind: 'spelunkr', section: 'Spelunkr' };
 }
 
-// Every channel the app can show (IPTV ones even when they're kept off the MiSTer's dial).
+// Every channel the app can show: OOMPAS Box and Spelunkr, then IPTV.
 async function appChannels(bc) {
   const base = (await bc.lineup()).channels;
   const ids = new Set(base.map(c => c.id));
@@ -2112,7 +1662,7 @@ async function appGuide(bc, dials, from, until) {
 function playInfo(bc, c, q) {
   const w = Math.min(1440, Math.max(320, Number(q.get('w')) || 960)) & ~1;
   const h = Math.min(1080, Math.max(240, Number(q.get('h')) || 720)) & ~1;
-  const tune = `/tune/${c.dial}.ts?viewer=app&nobanner=1&w=${w}&h=${h}&quality=high`;
+  const tune = `/tune/${c.dial}.ts?w=${w}&h=${h}`;
   if (c.kind !== 'iptv') return { mode: 'ts', url: tune, aspect: '4:3' };
   const u = c.iptv.url;
   const opts = { ua: c.iptv.ua, referrer: c.iptv.referrer };
@@ -2147,7 +1697,7 @@ async function handleApp(bc, req, res, url) {
   }
   if (!p.startsWith('/api/')) return false;
   if (p === '/api/state') {
-    sendJson(res, { name: 'OOMPAS Box', port: CFG.port, addresses: lanAddresses(), settings: SETTINGS,
+    sendJson(res, { name: 'OOMPAS Box', port: CFG.port, settings: SETTINGS,
                     iptv: bc.iptv?.status() || [], iptvChannels: bc.iptv?.channels.length || 0, iptvCountries: bc.iptv?.countries || {}, iptvCategories: bc.iptv?.categories || {}, iptvLanguages: bc.iptv?.languages || {}, iptvCheck: bc.iptv?.check || null,
                     catalog: CATALOG, watching: [...STREAMS].map(s => ({ addr: s.addr, viewer: s.viewer, dial: s.dial })),
                     x264: !!CFG.x264, oompasReady: !!bc.oompas?.complete });
@@ -2192,19 +1742,6 @@ async function handleApp(bc, req, res, url) {
   return true;
 }
 
-async function nowAll(bc) {
-  const l = await bc.lineup();
-  const at = now();
-  return Promise.all(l.channels.map(async c => {
-    try {
-      const ch = await bc.channel(c.id);
-      const p = (await programsBetween(bc, ch, at, at + 1000))[0];
-      return { dial: c.dial, id: c.id, name: c.name, call: c.call || callSign(c.name), color: c.color,
-               now: p ? p.title : (c.oompas ? 'Finding tapes…' : 'Off the air'), endsInSeconds: p ? Math.round((p.endMs - at) / 1000) : null };
-    } catch (e) { return { dial: c.dial, id: c.id, name: c.name, error: e.message }; }
-  }));
-}
-
 const esc = s => String(s ?? '').replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
 
 async function main() {
@@ -2222,7 +1759,7 @@ async function main() {
     const fetchJson = async url => {
       const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 30000);
       try {
-        const r = await fetch(url, { signal: ctl.signal, headers: { accept: 'application/json', 'user-agent': 'oompas-box (personal TV for a MiSTer)' } });
+        const r = await fetch(url, { signal: ctl.signal, headers: { accept: 'application/json', 'user-agent': 'oompas-box (personal retro TV app)' } });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return await r.json();
       } finally { clearTimeout(t); }
@@ -2257,55 +1794,10 @@ async function main() {
       let m;
       if (await handleApp(bc, req, res, url)) return;
       if ((m = url.pathname.match(/^\/tune\/(\d+)(?:\.ts)?$/))) {
-        // Optional ?w=640&h=240 (e.g. a MiSTer using the CRT-sized framebuffer).
+        // H.264 + AAC in MPEG-TS for the app's player, at ?w=..&h=.. (the Stream resolution setting).
         const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, (Number(v) || 0) & ~1));
-        const app = url.searchParams.get('viewer') === 'app';
-        const size = { w: url.searchParams.has('w') ? clamp(url.searchParams.get('w'), 160, app ? 1440 : 720) : CFG.width,
-                       h: url.searchParams.has('w') ? clamp(url.searchParams.get('h') || 240, 120, app ? 1080 : 576) : CFG.height,
-                       pic: pictureParams(url.searchParams) };
-        size.audioOnly = url.searchParams.get('audioonly') === '1';
-        size.hq = url.searchParams.get('quality') === 'high';
-        // The Groovy sender decodes on this PC, so it can take x264 in full colour; a MiSTer
-        // decodes on its own small processor, so it gets plain (but generous) MPEG-2.
-        size.studio = size.hq && url.searchParams.get('viewer') === 'groovy';
-        // The TV app (and later TV boxes) play H.264 + AAC in the browser engine.
-        size.app = app && CFG.x264;
-        if (app && !CFG.x264) throw Object.assign(new Error('This ffmpeg has no x264 encoder, which the app needs'), { status: 500 });
-        return await streamChannel(bc, m[1], req, res, size, { nobanner: size.audioOnly || url.searchParams.get('nobanner') === '1', viewer: url.searchParams.get('viewer') || '' });
-      }
-      if (url.pathname === '/channels.json') {
-        const l = await bc.lineup();
-        res.writeHead(200, { 'content-type': 'application/json' });
-        return res.end(JSON.stringify({ source: bc.source, channels: l.channels.map(c => ({ dial: c.dial, id: c.id, name: c.name, call: c.call || callSign(c.name), color: c.color })) }));
-      }
-      if ((m = url.pathname.match(/^\/settings\.(rgba|png)$/))) {
-        const w = Math.min(720, Math.max(160, Number(url.searchParams.get('w')) || CFG.width)) & ~1;
-        const h = Math.min(576, Math.max(120, Number(url.searchParams.get('h')) || CFG.height)) & ~1;
-        const sel = Math.min(SETTINGS_ROWS.length - 1, Math.max(0, Number(url.searchParams.get('sel')) || 0));
-        const img = await renderSettings(sel, w, h, m[1], pictureParams(url.searchParams));
-        res.writeHead(200, { 'content-type': m[1] === 'png' ? 'image/png' : 'application/octet-stream', 'cache-control': 'no-store' });
-        return res.end(img);
-      }
-      if ((m = url.pathname.match(/^\/banner\.(rgba|png)$/))) {
-        const w = Math.min(720, Math.max(160, Number(url.searchParams.get('w')) || CFG.width)) & ~1;
-        const h = Math.min(576, Math.max(120, Number(url.searchParams.get('h')) || CFG.height)) & ~1;
-        const img = await renderBanner(bc, url.searchParams.get('dial'), w, h, pictureParams(url.searchParams));
-        const out = m[1] === 'png' ? await rgbaToPng(img, w, h) : img;
-        res.writeHead(200, { 'content-type': m[1] === 'png' ? 'image/png' : 'application/octet-stream', 'x-width': w, 'x-height': h, 'cache-control': 'no-store' });
-        return res.end(out);
-      }
-      if ((m = url.pathname.match(/^\/guide\.(rgba|png)$/))) {
-        const w = Math.min(720, Math.max(160, Number(url.searchParams.get('w')) || CFG.width)) & ~1;
-        const h = Math.min(576, Math.max(120, Number(url.searchParams.get('h')) || CFG.height)) & ~1;
-        const ch = url.searchParams.get('ch');
-        const style = url.searchParams.get('style') || CFG.guideStyle;
-        const draw = style === 'classic' ? renderGuide : renderGuideVapor;
-        const img = await draw(bc, url.searchParams.get('sel'), w, h, m[1], pictureParams(url.searchParams),
-                               { snapshot: ch ? snapshotFor(bc, ch) : null, info: url.searchParams.get('info') === '1', logo: url.searchParams.get('logo') || undefined,
-                                 logoFont: url.searchParams.get('font') || undefined });
-        res.writeHead(200, { 'content-type': m[1] === 'png' ? 'image/png' : 'application/octet-stream',
-                             'x-width': w, 'x-height': h, 'cache-control': 'no-store' });
-        return res.end(img);
+        const size = { w: clamp(url.searchParams.get('w') || 960, 320, 1440), h: clamp(url.searchParams.get('h') || 720, 240, 1080), app: true };
+        return await streamChannel(bc, m[1], req, res, size, { viewer: 'app' });
       }
       // The OOMPAS Server app's Stop button (only from this PC, with the app's token).
       if (url.pathname === '/quit') {
@@ -2321,20 +1813,7 @@ async function main() {
         res.writeHead(200, { 'content-type': 'application/json' });
         return res.end(JSON.stringify({ ready: !!bc.oompas?.complete, channels: bc.oompas?.status() || [] }, null, 1));
       }
-      if (url.pathname === '/now.json') {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        return res.end(JSON.stringify(await nowAll(bc), null, 1));
-      }
-      if (url.pathname === '/') {
-        const rows = (await nowAll(bc)).map(c =>
-          `<tr><td style="color:${esc(c.color)}"><b>${esc(c.dial)}</b></td><td>${esc(c.name)}</td>` +
-          `<td>${esc(c.error ? '⚠ ' + c.error : c.now)}</td><td><a href="/tune/${esc(c.dial)}.ts">stream</a></td></tr>`).join('');
-        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-        return res.end(`<!doctype html><meta charset=utf-8><meta http-equiv=refresh content=30><title>OOMPAS Box</title>
-<body style="background:#120b2e;color:#eee;font:15px/1.5 monospace;padding:20px"><h2 style="color:#ffd84a">OOMPAS BOX</h2>
-<p>${watchingSummary()} · open any "stream" link in VLC to watch on this PC · <a style="color:#7fd" href="/guide.png?w=640&h=480">guide preview</a> · <a style="color:#7fd" href="/oompas.json">tape counts</a></p>
-<table cellpadding=4>${rows}</table><p style="opacity:.6">OOMPAS Box channels are scheduled from Internet Archive searches (oompas-channels.json). Channels ${esc(bc.oompas?.config.spelunkrDialOffset ?? 100)}+ come from <a style="color:#7fd" href="https://spelunkr.tv">spelunkr.tv</a>. Video from the Internet Archive.</p>`);
-      }
+      if (url.pathname === '/') { res.writeHead(302, { location: '/tv/' }); return res.end(); }
       res.writeHead(404); res.end('not found');
     } catch (e) {
       log('request failed: ' + e.message);
@@ -2343,10 +1822,11 @@ async function main() {
     }
   });
 
-  server.listen(CFG.port, '0.0.0.0', () => {
+  // Only this computer can reach it (no firewall prompt). LISTEN=0.0.0.0 opens it to your network,
+  // e.g. to watch from another screen's browser.
+  server.listen(CFG.port, CFG.listen, () => {
     log(`OOMPAS Box server ready on port ${CFG.port}`);
-    for (const ip of lanAddresses()) log(`  put this in spelunkr.ini on the MiSTer:  server=${ip}:${CFG.port}`);
-    log(`  guide in your browser: http://localhost:${CFG.port}/   TV app: http://localhost:${CFG.port}/tv/`);
+    log(`  watch in a browser: http://localhost:${CFG.port}/tv/`);
   });
 }
 
