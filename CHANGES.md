@@ -1,3 +1,13 @@
+## OOMPAS Box 1.3.3 (engine update)
+
+- Fix: YouTube channels could play a different video than the guide said, and loop it. Reading a playlist sometimes took a
+  video's length and title from the one before it; it now waits until the player is really on each video. Lists read by
+  older versions are read again automatically.
+- If a video turns out shorter or longer than listed, the schedule corrects itself, and a video that ends early is never
+  replayed; the channel waits for the next one.
+- The shuffle keeps its order when a video is added or dropped.
+- Captions (CC) now come on by themselves on every video and channel when the setting is on.
+
 ## OOMPAS Box 1.3.2
 
 - Safer engine updates: a new engine is downloaded in the background and starts the next time OOMPAS Box opens, instead of

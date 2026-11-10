@@ -10,15 +10,11 @@ const EPOCH = Date.UTC(2026, 0, 1);
 const COLORS = ['#ff4e45', '#ff8a3d', '#ffd23f', '#5ad27a', '#4fb0ff', '#a07bff'];
 const hash = s => crypto.createHash('sha1').update(String(s)).digest();
 
-// Same order every time for the same channel and cycle, different each cycle.
+// Same order every time for the same channel and cycle, different each cycle. Each video's place
+// comes from its own id, so adding or dropping one video doesn't reorder the others.
 function shuffled(arr, seed) {
-  const a = arr.slice(), h = hash(seed);
-  let x = h.readUInt32LE(0) || 1;
-  const rnd = () => { x ^= x << 13; x >>>= 0; x ^= x >>> 17; x ^= x << 5; x >>>= 0; return x / 4294967296; };
-  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
-  return a;
+  return arr.map(v => [hash(`${seed}|${v.id}`).readUInt32LE(0), v]).sort((a, b) => a[0] - b[0]).map(x => x[1]);
 }
-
 // A link -> what to play. Playlists: list=…  Channels: /channel/UC… (their uploads playlist is UU…).
 // @handles, /c/ and /user/ links need the channel id, which the server looks up once.
 export function parseYouTubeLink(raw) {
@@ -162,7 +158,7 @@ export class YouTube {
 
   // From the app's scan: [{ id, title, dur (seconds) }], in playlist order. Videos that won't play
   // in an embedded player come back with bad: true.
-  setVideos(id, videos, done = true) {
+  setVideos(id, videos, done = true, scanV = 1) {
     const first = this.channels.find(x => x.id === id);
     if (!first) throw Object.assign(new Error('No such YouTube channel'), { status: 404 });
     const clean = (Array.isArray(videos) ? videos : []).slice(0, 5000)
@@ -171,7 +167,7 @@ export class YouTube {
     for (const c of this.channels.filter(x => x.id === id || (first.list && x.list === first.list))) {
       c.videos = clean.filter(v => !v.bad);
       c.bad = [...new Set([...(c.bad || []).filter(b => !clean.some(v => v.id === b)), ...clean.filter(v => v.bad).map(v => v.id)])];
-      if (done) c.scannedAt = Date.now();
+      if (done) { c.scannedAt = Date.now(); c.scanV = scanV; }
     }
     this.save();
     if (done) this.log(`YouTube: ${first.name}: ${this.playable(first).length} videos ready${first.bad.length ? `, ${first.bad.length} can’t play outside YouTube` : ''}`);
@@ -184,6 +180,16 @@ export class YouTube {
     if (!c || !/^[\w-]{11}$/.test(videoId) || c.bad.includes(videoId)) return;
     for (const o of this.channels) if ((o === c || (c.list && o.list === c.list)) && !o.bad.includes(videoId)) o.bad.push(videoId);
     this.save();
+  }
+
+  // The player found a video's real length differs from the list's.
+  setLength(id, videoId, dur) {
+    const c = this.channels.find(x => x.id === id);
+    if (!c || !(dur > 0)) return;
+    let changed = false;
+    for (const o of this.channels) if (o === c || (c.list && o.list === c.list))
+      for (const v of o.videos) if (v.id === videoId && Math.abs(v.dur - dur) > 3) { v.dur = Math.round(dur); changed = true; }
+    if (changed) { this.save(); this.log(`YouTube: corrected the length of ${videoId}`); }
   }
 
   playable(c) { return c.videos.filter(v => v.dur >= 5 && !c.bad.includes(v.id)); }
@@ -246,13 +252,13 @@ export class YouTube {
     if (!c.list) { this.resolveBuiltins(); return { ytId: c.id, list: '', finding: c.handle || c.name }; }
     const p = this.programs(ch, t, t + 1)[0];
     if (!p || !p.videoId) return { ytId: c.id, list: c.list, scan: !c.scannedAt || Date.now() - c.scannedAt > 7 * 86400e3 };
-    return { ytId: c.id, list: c.list, videoId: p.videoId, start: Math.max(0, (t - p.startMs) / 1000), endMs: p.endMs,
+    return { ytId: c.id, list: c.list, videoId: p.videoId, start: Math.max(0, (t - p.startMs) / 1000), endMs: p.endMs, dur: (p.endMs - p.startMs) / 1000,
              title: p.title, scan: Date.now() - c.scannedAt > 7 * 86400e3 };
   }
 
   status() {
     return this.channels.slice().sort((a, b) => a.dial - b.dial).map(c => ({ id: c.id, name: c.name, dial: c.dial, link: c.link, list: c.list, order: c.order, builtin: !!c.builtin,
       videos: this.playable(c).length, bad: c.bad.length, hours: Math.round(this.playable(c).reduce((s, v) => s + v.dur, 0) / 360) / 10,
-      scannedAt: c.scannedAt }));
+      scannedAt: c.scannedAt, scanV: c.scanV || 0 }));
   }
 }

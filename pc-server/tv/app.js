@@ -121,7 +121,7 @@ function play(info, seq, isFallback) {
     go();
   } else if (info.mode === 'hls') {
     if (window.Hls && Hls.isSupported()) {
-      const h = new Hls({ maxBufferLength: 30, liveSyncDurationCount: 3, manifestLoadingMaxRetry: 2, levelLoadingMaxRetry: 2,
+      const h = new Hls({ subtitleDisplay: ccOn(), maxBufferLength: 30, liveSyncDurationCount: 3, manifestLoadingMaxRetry: 2, levelLoadingMaxRetry: 2,
                           startLevel: S.settings?.resolution === 'low' ? 0 : -1 });
       h.on(Hls.Events.ERROR, (e, d) => { if (d.fatal) fail(d.details); });
       // Lower resolution: cap the stream's quality (Standard: up to 480 lines, Low: the smallest one).
@@ -135,6 +135,7 @@ function play(info, seq, isFallback) {
         if (r === 'low') h.currentLevel = cap;
       });
       h.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => applyCaptions());
+      h.on(Hls.Events.NON_NATIVE_TEXT_TRACKS_FOUND, () => applyCaptions());
       h.loadSource(abs(info.url));
       h.attachMedia(video);
       S.hls = h;
@@ -162,7 +163,7 @@ function applyCaptions() {
   $('#ccbtn')?.classList.toggle('on', on);
   if (S.yt) {
     try {
-      if (on) { S.yt.loadModule('captions'); S.yt.setOption('captions', 'track', { languageCode: 'en' }); }
+      if (on) { S.yt.loadModule('captions'); S.yt.setOption('captions', 'reload', true); S.yt.setOption('captions', 'track', { languageCode: 'en' }); }
       else S.yt.unloadModule('captions');
     } catch {}
     return;
@@ -180,6 +181,10 @@ function applyCaptions() {
   if (!h || !h.subtitleTracks?.length) for (const t of tts) t.mode = t === want ? 'showing' : 'disabled';
 }
 video.textTracks.addEventListener('addtrack', () => applyCaptions());
+// Players load their caption tracks a little after the picture starts, so apply again shortly after.
+let ccT = [];
+function captionsSoon() { ccT.forEach(clearTimeout); applyCaptions(); ccT = [800, 2500, 6000].map(ms => setTimeout(applyCaptions, ms)); }
+video.addEventListener('playing', () => captionsSoon());
 function toggleCaptions() {
   const on = !ccOn();
   S.settings = { ...(S.settings || {}), captions: on };
@@ -206,7 +211,7 @@ function ytApi() {
   return ytApiP;
 }
 const YT_VARS = () => ({ autoplay: 1, controls: 0, disablekb: 1, fs: 0, rel: 0, iv_load_policy: 3, playsinline: 1, cc_load_policy: ccOn() ? 1 : 0, cc_lang_pref: 'en', origin: location.origin });
-let ytTimer = 0;
+let ytTimer = 0, ytEnded = { id: '', at: 0 };
 function stopYt() {
   clearTimeout(ytTimer);
   if (S.yt) { try { S.yt.destroy(); } catch {} S.yt = null; }
@@ -226,6 +231,12 @@ async function playYt(info, seq) {
   const box = el('div'); $('#yt').innerHTML = ''; $('#yt').append(box);
   let started = false;
   const watchdog = setTimeout(() => { if (!started && seq === tuneSeq) noSignal('No picture from YouTube'); }, 20000);
+  // If this video already ended a moment ago (its slot runs longer than the video), wait for the next one.
+  if (ytEnded.id === info.videoId && Date.now() - ytEnded.at < 15000 && info.endMs) {
+    staticOn(true);
+    ytTimer = setTimeout(() => retune(0), Math.max(500, info.endMs - Date.now() + 500));
+    return;
+  }
   const p = S.yt = new Y.Player(box, {
     videoId: info.videoId, playerVars: { ...YT_VARS(), start: info.start > 3 ? Math.floor(info.start) : 0 },
     events: {
@@ -234,17 +245,21 @@ async function playYt(info, seq) {
         e.target.setVolume(Math.round(S.volume * 100));
         if (S.muted) e.target.mute(); else e.target.unMute();
         if (info.start > 3) e.target.seekTo(info.start, true);
-        if (ccOn()) applyCaptions();
         e.target.playVideo();
       },
       onStateChange: e => {
         if (seq !== tuneSeq) return;
         if (e.data === Y.PlayerState.PLAYING && !started) {
           started = true; clearTimeout(watchdog); staticOn(false); $('#nosignal').hidden = true;
+          captionsSoon();
+          // The real length differs from the list's: tell the server, so the schedule is right from now on.
+          const real = e.target.getDuration?.() || 0;
+          if (real > 0 && info.dur && Math.abs(real - info.dur) > 3 && e.target.getVideoData?.()?.video_id === info.videoId)
+            post('/api/youtube/length', { id: info.ytId, videoId: info.videoId, dur: real }).catch(() => {});
           // Back to the schedule when this video's slot ends, even if YouTube's copy runs a bit longer.
           if (info.endMs) ytTimer = setTimeout(() => retune(0), Math.max(1000, info.endMs - Date.now() + 1500));
         }
-        if (e.data === Y.PlayerState.ENDED) retune();
+        if (e.data === Y.PlayerState.ENDED) { ytEnded = { id: info.videoId, at: Date.now() }; retune(); }
       },
       onError: () => {
         if (seq !== tuneSeq) return;
@@ -260,6 +275,7 @@ async function playYt(info, seq) {
 // Scanning: reads a playlist's videos (titles and lengths) with a hidden YouTube player, one
 // channel at a time, and sends them to the server, which makes the schedule.
 const SCAN = { queue: [], busy: false, cur: null };
+const SCAN_V = 2;   // lists read by older versions (lengths could be off by one video) get read again
 function scanQueue(ytId, list, name) {
   if (!list || SCAN.cur?.list === list || SCAN.queue.some(q => q.list === list)) return;
   SCAN.queue.push({ ytId, list, name });
@@ -305,21 +321,25 @@ async function scanList(job) {
     for (const id of ids) {
       err = null; state = -1;
       p.cueVideoById(id);
+      // The player keeps answering about the previous video for a moment, so only read the length
+      // and title once it says it's on this one.
+      const on = () => p.getVideoData?.()?.video_id === id;
+      const read = () => (on() ? p.getDuration() || 0 : 0);
       let dur = 0;
-      for (let i = 0; i < 16 && !dur && err == null; i++) { await sleep(150); dur = p.getDuration() || 0; }
+      for (let i = 0; i < 20 && !dur && err == null; i++) { await sleep(150); dur = read(); }
       if (!dur && err == null) {             // some videos only say how long they are once playing
         p.playVideo();
-        for (let i = 0; i < 40 && !dur && err == null; i++) { await sleep(200); dur = state === 1 ? p.getDuration() || 0 : 0; }
+        for (let i = 0; i < 40 && !dur && err == null; i++) { await sleep(200); dur = state === 1 ? read() : 0; }
         p.pauseVideo();
       }
-      const title = (p.getVideoData && p.getVideoData()?.title) || titles.get(id) || '';
+      const title = (on() && p.getVideoData()?.title) || titles.get(id) || '';
       out.push({ id, title, dur, bad: err != null || !dur });
       job.done++;
       if (S.mode === 'settings' && job.done % 5 === 0) renderSettings();
       // Send what we have every so often, so the channel can start before the scan finishes.
       if (Date.now() - lastSend > 15000) { lastSend = Date.now(); await post('/api/youtube/videos', { id: job.ytId, videos: out, done: false }).catch(() => {}); }
     }
-    await post('/api/youtube/videos', { id: job.ytId, videos: out, done: true });
+    await post('/api/youtube/videos', { id: job.ytId, videos: out, done: true, scanV: SCAN_V });
     await loadState().catch(() => {}); await loadChannels().catch(() => {});
     const same = new Set((S.server?.youtube || []).filter(y => y.list === job.list).map(y => 'yt-' + y.id));
     if (same.has(S.cur?.id) && !S.yt) tune(S.cur.dial, { quiet: true });   // was waiting for this list
@@ -329,7 +349,7 @@ async function scanList(job) {
 }
 // Channels that were never scanned, or not for a week, get scanned in the background.
 function scanStale() {
-  for (const c of S.server?.youtube || []) if (c.list && (!c.scannedAt || Date.now() - c.scannedAt > 7 * 86400e3)) scanQueue(c.id, c.list, c.name);
+  for (const c of S.server?.youtube || []) if (c.list && (!c.scannedAt || (c.scanV || 0) < SCAN_V || Date.now() - c.scannedAt > 7 * 86400e3)) scanQueue(c.id, c.list, c.name);
 }
 
 function showGate() {

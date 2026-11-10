@@ -1795,7 +1795,8 @@ async function handleApp(bc, req, res, url) {
         }
         yt.update(b.id, b); sendJson(res, { ok: true, youtube: yt.status() });
       } else if (act === 'remove') { yt.remove(b.id); sendJson(res, { ok: true, youtube: yt.status() }); }
-      else if (act === 'videos') { yt.setVideos(b.id, b.videos, b.done !== false); sendJson(res, { ok: true, youtube: yt.status() }); }
+      else if (act === 'videos') { yt.setVideos(b.id, b.videos, b.done !== false, Number(b.scanV) || 1); sendJson(res, { ok: true, youtube: yt.status() }); }
+      else if (act === 'length') { yt.setLength(b.id, b.videoId, Number(b.dur)); sendJson(res, { ok: true }); }
       else if (act === 'bad') { yt.markBad(b.id, b.videoId); sendJson(res, { ok: true }); }
       else sendJson(res, { error: 'not found' }, 404);
     } catch (e) { sendJson(res, { error: e.message }, e.status || 500); }
