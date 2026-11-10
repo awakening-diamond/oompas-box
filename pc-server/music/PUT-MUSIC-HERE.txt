@@ -1,0 +1,2 @@
+Put your own music here (mp3, wav, flac, ogg, m4a) and the Guide and Weather channels will play it
+instead of the built-in chord pad. Restart the server after adding files.

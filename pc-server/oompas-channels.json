@@ -1,0 +1,475 @@
+{
+ "_help": [
+  "OOMPAS Box channel lineup. Edit freely; restart the server to apply (today's schedule is rebuilt).",
+  "kind: archive (Internet Archive tapes), guide, weather (drawn live on your PC), mirror (plays a Spelunkr channel's schedule).",
+  "pools: named Internet Archive searches (archive.org advanced-search syntax; 'AND mediatype:movies' is added for you).",
+  "  runs: play this many episodes of a series in a row. episodes: look inside multi-file items for episodes.",
+  "  name: the block's name in the guide; one name, or one per part of the day {morning, afternoon, prime, late}.",
+  "  label: what kind of program it is (Movie, Cartoon, Documentary...). Left out, it's worked out from the length.",
+  "  list: how the guide's grid names programs: block (the block name), title (each film), series (series name, else title). Follows the label if left out.",
+  "  minMin / maxMin: only use tapes this long (minutes). rows: how many search results to use (most-viewed first).",
+  "blocks: dayparts, e.g. {\"from\": \"15:00\", \"to\": \"18:00\", \"pool\": \"action\"}; outside blocks the 'main' pool plays.",
+  "ads: put a short pod of vintage commercials between shows. Channels may share pools; the scheduler never airs",
+  "the same tape on two channels at the same time. Spelunkr's own channels appear above these, at 100 + their dial."
+ ],
+ "spelunkrDialOffset": 100,
+ "music": {
+  "_help": "Music for the Guide and Weather channels: in-store tapes, paulstretched and given reverb. Set \"music\": null to turn off. Your own files in pc-server/music play too.",
+  "q": "collection:attentionkmartshoppers",
+  "tapes": 8,
+  "excerptMin": 3,
+  "stretch": 10
+ },
+ "adPool": {
+  "q": "collection:(classic_tv_commercials OR adviews) OR (collection:prelinger AND subject:(commercial OR commercials OR advertising))",
+  "rows": 400,
+  "minMin": 0.15,
+  "maxMin": 1.25
+ },
+ "channels": [
+  {
+   "dial": 2,
+   "name": "OOMPAS Guide",
+   "call": "OGD",
+   "kind": "guide",
+   "description": "Scrolling listings for every channel, under clouds that never quite clear."
+  },
+  {
+   "dial": 3,
+   "name": "Weather",
+   "call": "WTHR",
+   "kind": "weather",
+   "description": "Local forecasts for towns that don't quite exist. Updated on the 8s."
+  },
+  {
+   "dial": 4,
+   "name": "Paid Programming",
+   "call": "PAID",
+   "kind": "archive",
+   "description": "Infomercials, home shopping and sales pitches, around the clock.",
+   "pools": {
+    "main": {
+     "name": {
+      "morning": "Morning Bargains",
+      "afternoon": "Shop at Home",
+      "prime": "Paid Programming",
+      "late": "Overnight Infomercials"
+     },
+     "label": "Infomercial",
+     "q": "collection:(classic_tv_commercials OR adviews) OR subject:(infomercial OR infomercials OR \"home shopping\")",
+     "rows": 500,
+     "minMin": 0.15,
+     "maxMin": 40
+    }
+   }
+  },
+  {
+   "dial": 6,
+   "name": "Toons",
+   "call": "TOON",
+   "kind": "archive",
+   "ads": true,
+   "description": "Classic theatrical cartoons; strange independent animation after midnight.",
+   "pools": {
+    "main": {
+     "name": {
+      "morning": "Morning Cartoons",
+      "afternoon": "Cartoon Matinee",
+      "prime": "Prime Time Toons",
+      "late": "Late Toons"
+     },
+     "label": "Cartoon",
+     "q": "collection:(classic_cartoons OR animationandcartoons)",
+     "rows": 500,
+     "minMin": 3,
+     "maxMin": 40
+    },
+    "late": {
+     "name": "Midnight Animation",
+     "label": "Animation",
+     "q": "collection:animationandcartoons AND subject:(experimental OR surreal OR \"independent animation\" OR psychedelic)",
+     "rows": 300,
+     "minMin": 2,
+     "maxMin": 40
+    }
+   },
+   "blocks": [
+    {
+     "from": "22:00",
+     "to": "03:00",
+     "pool": "late"
+    }
+   ]
+  },
+  {
+   "dial": 7,
+   "name": "Saturday Morning",
+   "call": "SAT",
+   "kind": "mirror",
+   "mirror": "SATURDAY MORNING",
+   "description": "Kids' shows, cartoons and kid-safe films.",
+   "pools": {
+    "main": {
+     "name": {
+      "morning": "Saturday Morning",
+      "afternoon": "Afternoon Cartoons",
+      "prime": "Evening Cartoons",
+      "late": "Late Cartoons"
+     },
+     "label": "Cartoon",
+     "q": "collection:classic_cartoons OR (collection:educationalfilms AND subject:(children OR kids))",
+     "rows": 400,
+     "minMin": 3,
+     "maxMin": 40
+    }
+   }
+  },
+  {
+   "dial": 9,
+   "name": "Sci-Fi",
+   "call": "SCFI",
+   "kind": "archive",
+   "ads": true,
+   "description": "Space films, serials, flying saucers and atomic monsters.",
+   "pools": {
+    "main": {
+     "name": {
+      "morning": "Morning Matinee",
+      "afternoon": "Creature Feature Matinee",
+      "prime": "Sci-Fi Prime",
+      "late": "Midnight Monsters"
+     },
+     "q": "(collection:SciFi_Horror AND NOT subject:horror) OR (collection:(feature_films OR classic_tv) AND subject:(\"science fiction\" OR sci-fi OR space OR \"outer space\" OR alien OR serial))",
+     "rows": 400,
+     "minMin": 15,
+     "maxMin": 150
+    }
+   }
+  },
+  {
+   "dial": 11,
+   "name": "Crime & Noir",
+   "call": "NOIR",
+   "kind": "archive",
+   "ads": true,
+   "description": "Film noir, detective shows and police dramas; noir all night.",
+   "pools": {
+    "main": {
+     "name": {
+      "morning": "Morning Mysteries",
+      "afternoon": "Afternoon Detectives",
+      "prime": "Prime Time Crime",
+      "late": "Midnight Noir"
+     },
+     "q": "collection:Film_Noir OR (collection:classic_tv AND subject:(detective OR crime OR police OR mystery)) OR (collection:(prelinger OR fedflix) AND subject:(police OR crime))",
+     "rows": 500,
+     "minMin": 8,
+     "maxMin": 120
+    },
+    "noir": {
+     "name": "Noir After Dark",
+     "label": "Movie",
+     "q": "collection:Film_Noir OR (collection:feature_films AND subject:(\"film noir\" OR noir))",
+     "rows": 300,
+     "minMin": 55,
+     "maxMin": 130
+    }
+   },
+   "blocks": [
+    {
+     "from": "22:00",
+     "to": "04:00",
+     "pool": "noir"
+    }
+   ]
+  },
+  {
+   "dial": 13,
+   "name": "Horror",
+   "call": "FEAR",
+   "kind": "archive",
+   "ads": true,
+   "description": "Creature features, haunted houses and late-night shockers.",
+   "pools": {
+    "main": {
+     "name": {
+      "morning": "Fright Matinee",
+      "afternoon": "Creature Feature",
+      "prime": "Shock Theater",
+      "late": "The Graveyard Shift"
+     },
+     "q": "(collection:SciFi_Horror AND subject:(horror OR monster OR vampire OR zombie OR ghost OR werewolf)) OR (collection:(feature_films OR vhsvault) AND subject:(horror OR \"public domain horror\" OR vampire OR zombie OR \"haunted house\"))",
+     "rows": 500,
+     "minMin": 20,
+     "maxMin": 130
+    }
+   }
+  },
+  {
+   "dial": 19,
+   "name": "Anime",
+   "call": "ANIM",
+   "kind": "archive",
+   "description": "TV anime series, in shuffled runs of episodes.",
+   "pools": {
+    "main": {
+     "name": {
+      "morning": "Anime Breakfast",
+      "afternoon": "Anime Afternoon",
+      "prime": "Anime Prime",
+      "late": "Anime After Dark"
+     },
+     "label": "Anime",
+     "q": "subject:anime",
+     "rows": 200,
+     "minMin": 15,
+     "maxMin": 35,
+     "runs": 3,
+     "episodes": true
+    }
+   }
+  },
+  {
+   "dial": 20,
+   "name": "Mecha & Action",
+   "call": "MCHA",
+   "kind": "archive",
+   "description": "Action and mecha anime, with transmissions from the station between shows.",
+   "bumpers": [
+    "TRANSMISSION CONTINUES",
+    "SIGNAL STRONG",
+    "STAND BY FOR ACTION",
+    "ORBIT HOLDING STEADY",
+    "YOU ARE STILL HERE"
+   ],
+   "pools": {
+    "main": {
+     "name": {
+      "morning": "Morning Launch",
+      "afternoon": "Afternoon Action",
+      "prime": "Prime Transmission",
+      "late": "Midnight Run"
+     },
+     "label": "Anime",
+     "q": "subject:anime AND subject:(mecha OR mech OR robot OR action OR \"giant robot\" OR space OR battle)",
+     "rows": 200,
+     "minMin": 15,
+     "maxMin": 35,
+     "runs": 3,
+     "episodes": true
+    }
+   }
+  },
+  {
+   "dial": 22,
+   "name": "Anime Theater",
+   "call": "ANTH",
+   "kind": "archive",
+   "description": "Anime films and OVAs in the evening; series runs by day.",
+   "pools": {
+    "main": {
+     "name": {
+      "morning": "Anime Theater",
+      "afternoon": "Anime Theater",
+      "prime": "Anime Premiere",
+      "late": "Late Show Anime"
+     },
+     "label": "Movie",
+     "q": "subject:anime AND subject:(ova OR \"original video animation\" OR movie OR film OR \"anime movie\")",
+     "rows": 200,
+     "minMin": 25,
+     "maxMin": 150,
+     "episodes": true
+    },
+    "day": {
+     "name": "Daytime Anime",
+     "label": "Anime",
+     "q": "subject:anime",
+     "rows": 200,
+     "minMin": 15,
+     "maxMin": 35,
+     "runs": 2,
+     "episodes": true
+    }
+   },
+   "blocks": [
+    {
+     "from": "06:00",
+     "to": "18:00",
+     "pool": "day"
+    }
+   ]
+  },
+  {
+   "dial": 26,
+   "name": "Classic Movies",
+   "call": "FLIX",
+   "kind": "archive",
+   "description": "Feature films, noir and silents.",
+   "pools": {
+    "main": {
+     "name": {
+      "morning": "Morning Matinee",
+      "afternoon": "Afternoon Matinee",
+      "prime": "Feature Presentation",
+      "late": "The Late Show"
+     },
+     "label": "Movie",
+     "q": "collection:(feature_films OR Film_Noir OR silent_films)",
+     "rows": 500,
+     "minMin": 45,
+     "maxMin": 180
+    }
+   }
+  },
+  {
+   "dial": 28,
+   "name": "Reruns",
+   "call": "RERN",
+   "kind": "archive",
+   "ads": true,
+   "description": "Classic sitcoms, westerns and dramas from the old networks.",
+   "pools": {
+    "main": {
+     "name": {
+      "morning": "Morning Reruns",
+      "afternoon": "Afternoon Classics",
+      "prime": "Prime Time Classics",
+      "late": "Late Night Classics"
+     },
+     "label": "TV Rerun",
+     "q": "collection:classic_tv",
+     "rows": 500,
+     "minMin": 15,
+     "maxMin": 65,
+     "runs": 2
+    }
+   }
+  },
+  {
+   "dial": 30,
+   "name": "Public Access",
+   "call": "PUBA",
+   "kind": "archive",
+   "description": "Whatever's on: hobby shows, meetings, home video.",
+   "pools": {
+    "main": {
+     "name": {
+      "morning": "Community Calendar",
+      "afternoon": "Hobby Hour",
+      "prime": "Access Live",
+      "late": "Overnight Access"
+     },
+     "label": "Public Access",
+     "q": "subject:(\"public access\" OR \"public access television\" OR \"community television\" OR \"cable access\" OR \"home movies\")",
+     "rows": 400,
+     "minMin": 3,
+     "maxMin": 90
+    }
+   }
+  },
+  {
+   "dial": 32,
+   "name": "Tech",
+   "call": "TECH",
+   "kind": "archive",
+   "ads": true,
+   "description": "Computer shows by day, video games after school.",
+   "pools": {
+    "main": {
+     "name": {
+      "morning": "Morning Byte",
+      "afternoon": "The Help Desk",
+      "prime": "Prime Time Tech",
+      "late": "Late Night Logon"
+     },
+     "q": "collection:computerchronicles OR (subject:(computers OR computer OR \"personal computer\") AND collection:(prelinger OR ephemera OR educationalfilms))",
+     "rows": 400,
+     "minMin": 5
+    },
+    "games": {
+     "name": "Game Room After School",
+     "label": "Video Games",
+     "q": "subject:(\"video games\" OR \"video game\" OR videogames OR \"game trailer\") AND NOT subject:(lets play OR \"let's play\")",
+     "rows": 300,
+     "minMin": 1,
+     "maxMin": 45
+    }
+   },
+   "blocks": [
+    {
+     "from": "15:00",
+     "to": "19:00",
+     "pool": "games"
+    }
+   ]
+  },
+  {
+   "dial": 34,
+   "name": "Discovery",
+   "call": "DOCS",
+   "kind": "archive",
+   "ads": true,
+   "description": "Documentaries and how-the-world-works films.",
+   "pools": {
+    "main": {
+     "name": {
+      "morning": "Morning Discovery",
+      "afternoon": "Classroom Hour",
+      "prime": "Prime Time Documentary",
+      "late": "Late Night Science"
+     },
+     "label": "Documentary",
+     "q": "collection:(educationalfilms OR fedflix) OR (collection:prelinger AND subject:(science OR history OR industry OR documentary))",
+     "rows": 500,
+     "minMin": 8,
+     "maxMin": 90
+    }
+   }
+  },
+  {
+   "dial": 36,
+   "name": "Nature",
+   "call": "NATR",
+   "kind": "archive",
+   "description": "Slow wildlife and landscape films with a warm, faded 1970s film-board look.",
+   "pools": {
+    "main": {
+     "name": {
+      "morning": "Morning Wilds",
+      "afternoon": "Nature Hour",
+      "prime": "Wild World",
+      "late": "Night Nature"
+     },
+     "label": "Nature Film",
+     "q": "subject:(nature OR wildlife OR animals OR birds OR ocean OR forest OR wilderness OR \"national film board of canada\") AND collection:(prelinger OR educationalfilms OR ephemera OR fedflix OR nasa OR opensource_movies)",
+     "rows": 500,
+     "minMin": 4,
+     "maxMin": 60
+    }
+   }
+  },
+  {
+   "dial": 38,
+   "name": "Music Video",
+   "call": "MUSC",
+   "kind": "archive",
+   "description": "Music videos in themed hours, with a request menu between.",
+   "pools": {
+    "main": {
+     "name": {
+      "morning": "Wake-Up Videos",
+      "afternoon": "After School Countdown",
+      "prime": "Prime Time Video Mix",
+      "late": "Late Night Videos"
+     },
+     "label": "Music Video",
+     "q": "subject:(\"music video\" OR \"music videos\" OR musicvideo)",
+     "rows": 500,
+     "minMin": 1.5,
+     "maxMin": 12
+    }
+   }
+  }
+ ]
+}

@@ -1,0 +1,5 @@
+FFmpeg (https://ffmpeg.org) is included as a separate program, unmodified, built with
+libx264 and other libraries and licensed under the GNU GPL v3 or later
+(https://www.gnu.org/licenses/gpl-3.0.html). Builds from the ffmpeg-static project
+(https://github.com/eugeneware/ffmpeg-static, release b6.1.1): Windows from gyan.dev,
+macOS from evermeet.cx / osxexperts.net. Source code for FFmpeg is at https://ffmpeg.org/download.html.

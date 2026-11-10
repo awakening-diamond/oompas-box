@@ -1,0 +1,110 @@
+{
+  "name": "oompas-box",
+  "productName": "OOMPAS Box",
+  "version": "1.1.0",
+  "description": "OOMPAS Box: retro TV channels from the Internet Archive, plus your IPTV, on your computer and your MiSTer",
+  "main": "main.js",
+  "author": "OOMPAS Box",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win nsis zip --x64",
+    "dist:mac": "electron-builder --mac zip --x64 --arm64",
+    "release": "node ../tools/release.mjs"
+  },
+  "devDependencies": {
+    "electron": "^45.2.3",
+    "electron-builder": "^26.18.0",
+    "ws": "^8.22.2"
+  },
+  "build": {
+    "appId": "box.oompas.app",
+    "productName": "OOMPAS Box",
+    "copyright": "OOMPAS Box",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "loading.html",
+      "build/icon.png",
+      "build/icon.ico",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../pc-server",
+        "to": "pc-server",
+        "filter": [
+          "**/*",
+          "!oompas-cache/**",
+          "!app-source/**",
+          "!*.exe",
+          "!*.bat",
+          "!*.sh",
+          "!vendor/schedule-engine.mjs",
+          "!music/**",
+          "!groovy-settings.json",
+          "!groovy-calibration.json"
+        ]
+      },
+      {
+        "from": "ffmpeg/${os}-${arch}",
+        "to": "ffmpeg"
+      },
+      {
+        "from": "ffmpeg/LICENSE-ffmpeg.txt",
+        "to": "ffmpeg/LICENSE.txt"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "OOMPAS-Box-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "shortcutName": "OOMPAS Box"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.entertainment",
+      "icon": "build/icon.png",
+      "identity": null,
+      "artifactName": "OOMPAS-Box-${version}-mac-${arch}.${ext}"
+    },
+    "asar": true,
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "awakening-diamond",
+        "repo": "oompas-box",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
+  }
+}

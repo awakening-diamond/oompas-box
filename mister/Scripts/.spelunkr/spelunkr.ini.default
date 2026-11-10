@@ -1,0 +1,62 @@
+[spelunkr]
+; Your PC's address, as server.mjs prints it when it starts (e.g. 192.168.1.50:8090).
+; auto: look for it on the network (wired or Wi-Fi) each time this address stops
+; answering, and remember what it finds here.
+server = auto
+; yes: write a server found on the network back into this file.
+remember_server = yes
+
+; Picture quality. auto: high on a network cable, normal on Wi-Fi.
+; high: sharper, no grain clean-up (about 3-6 Mbit/s). normal: lighter (about 1-2 Mbit/s).
+quality = auto
+
+; Channel to start on (blank = the last one you watched).
+start_channel =
+
+; 320x240 15 kHz mode used while watching.
+; auto = use the custom video_mode from your MiSTer.ini [MiSTer] section if it has one,
+; otherwise MiSTer SAM's 320,-16,32,32,240,1,3,13,5670.
+; If your CRT won't sync or the picture is off-center, try:
+;   video_mode = 320,16,20,64,240,1,3,15,6800
+video_mode = auto
+
+; How the picture reaches your TV:
+;   scaler = through the MiSTer scaler (VGA/RGB and HDMI setups; MiSTer SAM style)
+;   crt    = framebuffer sized for 15 kHz without the scaler. Use this for composite/
+;            S-Video (e.g. SuperStation AV out). Needs MiSTer Main from 2026-10-10 or newer.
+fb_mode = scaler
+
+; Picture adjustments (applied on the PC, so they also cover the banner and guide).
+; If the edges are cut off by your TV, shrink the picture a little, e.g. 94 / 94.
+picture_width = 100       ; percent, 50-100
+picture_height = 100      ; percent, 50-100
+picture_x = 0             ; pixels, + moves right, - moves left
+picture_y = 0             ; pixels, + moves down, - moves up
+brightness = 0            ; -100 to 100
+contrast = 100            ; percent
+saturation = 100          ; percent (0 = black and white)
+
+; Temporarily switch the menu core to the mode above while watching.
+; Your MiSTer.ini file itself is never edited.
+override_ini = yes
+
+; Seconds to wait for the menu core to come up before starting playback.
+display_wait = 2.5
+
+; Controller: d-pad up/down = channel up/down, d-pad left = previous channel,
+; d-pad right = TV guide.
+; Buttons below are listed by number. To find yours, set learn_buttons = yes,
+; run Spelunkr from the Scripts menu, and press them.
+learn_buttons = no
+quit_buttons = 6,8
+next_buttons =
+prev_buttons =
+recall_buttons =
+guide_buttons =
+
+; Extra mplayer options, if you need them.
+; Banner over the picture when you press Left (auto = use it if mplayer supports it; off = the
+; server draws the banner into the stream instead, which means a brief re-tune).
+banner_overlay = auto
+
+mplayer_args =

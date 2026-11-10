@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>OOMPAS Box</title>
+<link rel="icon" href="icon.png">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div id="stage">
+  <div id="screen" class="crt">
+    <div id="pic">
+      <video id="video" playsinline></video>
+      <canvas id="static" width="160" height="120"></canvas>
+      <div id="crt-overlay"></div>
+    </div>
+    <div id="nosignal" hidden><span>NO SIGNAL</span><small></small></div>
+  </div>
+
+  <!-- channel banner -->
+  <div id="banner" class="osd" hidden>
+    <div class="b-top">
+      <span class="b-dial"></span><span class="b-name"></span><span class="b-star" hidden>&#9733;</span>
+      <span class="b-logo"><img alt=""></span>
+      <span class="b-clock vt"></span>
+    </div>
+    <div class="b-now"><span class="b-title"></span><span class="b-time vt"></span></div>
+    <div class="b-progress"><i></i></div>
+    <div class="b-box">
+      <div class="b-kind"></div>
+      <div class="b-desc"></div>
+      <div class="b-next"></div>
+    </div>
+  </div>
+
+  <div id="digits" class="vt" hidden></div>
+  <div id="volume" class="osd" hidden><span class="vt">VOLUME</span><div class="bars"></div></div>
+  <div id="toast" hidden></div>
+  <div id="startgate" hidden><div>OOMPAS BOX</div><small>Press any key or click to start</small></div>
+
+  <!-- mouse helper -->
+  <div id="mousebar" hidden>
+    <button data-act="down" title="Channel down">CH &#9660;</button>
+    <button data-act="up" title="Channel up">CH &#9650;</button>
+    <button data-act="guide">Guide</button>
+    <button data-act="browse">Channels</button>
+    <button data-act="settings">Settings</button>
+    <button data-act="zoom" title="Picture shape (Z)">Zoom</button>
+    <button data-act="fullscreen" title="Full screen (F)">&#x26F6;</button>
+  </div>
+
+  <!-- guide -->
+  <div id="guide" class="panel" hidden>
+    <div class="g-head">
+      <div class="g-logo">OOMPAS BOX</div>
+      <div class="g-clock vt"></div>
+      <div class="g-info">
+        <div class="gi-chan"></div>
+        <div class="gi-time vt"></div>
+        <div class="gi-title"></div>
+        <div class="gi-sub"></div>
+        <div class="gi-bar"><i></i></div>
+        <div class="gi-next"></div>
+      </div>
+      <div class="g-pip"><span>TUNING</span></div>
+    </div>
+    <div class="g-filters"></div>
+    <div class="g-times vt"></div>
+    <div class="g-rows"></div>
+    <div class="hint">&#8593;&#8595; channels &nbsp; &#8592;&#8594; shows &nbsp; OK watch &nbsp; hold OK (or *) star &nbsp; C channel list &nbsp; Back close</div>
+  </div>
+
+  <!-- channel browser -->
+  <div id="browse" class="panel" hidden>
+    <div class="s-head"><div class="g-logo">OOMPAS BOX</div><div class="s-title">CHANNELS</div></div>
+    <div class="br-body">
+      <div class="br-cats"></div>
+      <div class="br-list"></div>
+    </div>
+    <div class="hint">&#8593;&#8595; choose &nbsp; &#8592;&#8594; categories / channels &nbsp; OK watch &nbsp; hold OK (or *) star &nbsp; Back close</div>
+  </div>
+
+  <!-- settings -->
+  <div id="settings" class="panel" hidden>
+    <div class="s-head"><div class="g-logo">OOMPAS BOX</div><div class="s-title">SETTINGS</div></div>
+    <div class="s-body"><div class="s-list"></div></div>
+    <div class="hint">&#8593;&#8595; choose &nbsp; &#8592;&#8594; change &nbsp; OK select &nbsp; Back close</div>
+  </div>
+</div>
+<script src="vendor/mpegts.js"></script>
+<script src="vendor/hls.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

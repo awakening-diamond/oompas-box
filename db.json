@@ -1,0 +1,45 @@
+{
+ "db_id": "oompas_box",
+ "timestamp": 1794281026,
+ "files": {
+  "Scripts/.spelunkr/OOMPAS Box.mgl": {
+   "hash": "aaa7244533edd1560ad08673ee20f481",
+   "size": 95,
+   "url": "https://raw.githubusercontent.com/awakening-diamond/oompas-box/main/mister/Scripts/.spelunkr/OOMPAS%20Box.mgl"
+  },
+  "Scripts/.spelunkr/oompas_daemon.py": {
+   "hash": "0435f16ecf18f3fe93f69df5675709cd",
+   "size": 1761,
+   "url": "https://raw.githubusercontent.com/awakening-diamond/oompas-box/main/mister/Scripts/.spelunkr/oompas_daemon.py"
+  },
+  "Scripts/.spelunkr/spelunkr.ini.default": {
+   "hash": "b4c96a0f0aacfe472d5e8dbd9bd075d4",
+   "size": 2539,
+   "url": "https://raw.githubusercontent.com/awakening-diamond/oompas-box/main/mister/Scripts/.spelunkr/spelunkr.ini.default"
+  },
+  "Scripts/.spelunkr/spelunkr_tv.py": {
+   "hash": "161439b34bd3a0c546da3b554208a507",
+   "size": 47610,
+   "url": "https://raw.githubusercontent.com/awakening-diamond/oompas-box/main/mister/Scripts/.spelunkr/spelunkr_tv.py"
+  },
+  "Scripts/oompas_box_install.sh": {
+   "hash": "ef704e7a1cd14c318802240fb082aee1",
+   "size": 202,
+   "url": "https://raw.githubusercontent.com/awakening-diamond/oompas-box/main/mister/Scripts/oompas_box_install.sh"
+  },
+  "Scripts/oompas_groovy_setup.sh": {
+   "hash": "1a0333515a1c1fcc5353f317ddfd964a",
+   "size": 4579,
+   "url": "https://raw.githubusercontent.com/awakening-diamond/oompas-box/main/mister/Scripts/oompas_groovy_setup.sh"
+  },
+  "Scripts/spelunkr.sh": {
+   "hash": "f641116889e54b2bbefdac6252c6fb58",
+   "size": 3672,
+   "url": "https://raw.githubusercontent.com/awakening-diamond/oompas-box/main/mister/Scripts/spelunkr.sh"
+  }
+ },
+ "folders": {
+  "Scripts": {},
+  "Scripts/.spelunkr": {}
+ }
+}

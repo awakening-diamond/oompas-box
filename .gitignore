@@ -1,0 +1,12 @@
+node_modules/
+desktop/dist/
+desktop/ffmpeg/*/
+pc-server/oompas-cache/
+pc-server/vendor/schedule-engine.mjs
+pc-server/groovy-settings.json
+pc-server/groovy-calibration.json
+pc-server/music/*
+!pc-server/music/PUT-MUSIC-HERE.txt
+__pycache__/
+*.pyc
+mister/Scripts/.spelunkr/last_channel
