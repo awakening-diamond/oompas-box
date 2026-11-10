@@ -1,3 +1,10 @@
+## OOMPAS Box 1.3.2
+
+- Safer engine updates: a new engine is downloaded in the background and starts the next time OOMPAS Box opens, instead of
+  switching while you watch. Help → Check for Updates offers to restart right away.
+- The log is now kept on disk (`oompas.log` in the data folder; the run before is `oompas-previous.log`), with a memory line
+  every 5 minutes and a note if the window stops responding. Help → Show Log File.
+
 ## OOMPAS Box 1.3.1 (engine update)
 
 - New: **captions (CC).** Press **T**, click the **CC** button (move the mouse to show it), or Settings → Picture → Captions.

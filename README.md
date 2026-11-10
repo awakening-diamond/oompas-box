@@ -167,8 +167,8 @@ OOMPAS Box has two parts that update separately:
 
 - **The engine** (`pc-server/`: channels, guide, YouTube, IPTV, the TV screens) updates itself. A few times a day the app
   checks this repo's `main` branch; when `pc-server/version.json` has a newer version, it downloads that folder, checks that it
-  loads, and switches to it. The picture blinks for a couple of seconds and you're back on the same channel. No installer. If a
-  new engine ever fails to start, the app goes back to the one it came with. **Help → Check for Updates** checks right away.
+  loads, and uses it the next time OOMPAS Box opens. No installer. If a new engine ever fails to start, the app goes back to
+  the one it came with. **Help → Check for Updates** checks right away.
 - **The app around it** (Electron, FFmpeg, the window and menus in `desktop/`) updates through
   [Releases](https://github.com/awakening-diamond/oompas-box/releases). Windows downloads it in the background and installs when
   you restart (it asks). On a Mac the app isn't signed by Apple, so it tells you and opens the download page; replace the app in

@@ -2,7 +2,7 @@
 // Starts the OOMPAS engine (pc-server/server.mjs) with a bundled FFmpeg, then shows
 // the TV interface (served by the server at /tv/) in a full-window player. Quitting the app
 // stops the server and everything it started.
-const { app, BrowserWindow, Menu, shell, ipcMain, dialog, powerSaveBlocker, screen, Notification } = require('electron');
+const { app, BrowserWindow, Menu, shell, ipcMain, dialog, powerSaveBlocker, screen } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const http = require('node:http');
@@ -87,7 +87,12 @@ function setupUpdates() {
 }
 async function checkForUpdatesNow() {
   const v = await checkEngine(true);
-  if (v) return dialog.showMessageBox({ title: 'OOMPAS Box', message: `Updated to ${v}.`, detail: 'The new version is already running.' });
+  if (v) {
+    const r = await dialog.showMessageBox({ title: 'OOMPAS Box', message: `OOMPAS Box ${v} is ready.`, buttons: ['Restart now', 'Later'], defaultId: 0, cancelId: 1,
+      detail: 'It starts the next time OOMPAS Box opens.' });
+    if (r.response === 0) restartApp();
+    return;
+  }
   if (!setupUpdates.done) setupUpdates.done = setupUpdates() ? 'on' : 'off';
   if (setupUpdates.done !== 'on') {
     return dialog.showMessageBox({ title: 'OOMPAS Box', message: 'Updates aren\u2019t set up in this copy.',
@@ -101,7 +106,22 @@ if (!app.requestSingleInstanceLock()) { app.quit(); }
 
 let win = null, server = null, external = false, quitting = false, blocker = -1;
 const LOG = [];
-const log = line => { LOG.push(line); if (LOG.length > 800) LOG.splice(0, 200); if (!PACKED) process.stdout.write(line + '\n'); };
+// The log is also kept on disk (oompas.log in the data folder; the last run's is oompas-previous.log),
+// so there's something to look at even after the app or the computer stops unexpectedly.
+const LOG_FILE = path.join(DATA, 'oompas.log');
+try { fs.mkdirSync(DATA, { recursive: true }); if (fs.existsSync(LOG_FILE)) fs.renameSync(LOG_FILE, path.join(DATA, 'oompas-previous.log')); } catch {}
+let logBytes = 0;
+const log = line => {
+  LOG.push(line); if (LOG.length > 800) LOG.splice(0, 200);
+  if (!PACKED) process.stdout.write(line + '\n');
+  try {
+    const t = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    const s = `${t}  ${line}\n`;
+    if (logBytes > 5e6) { fs.renameSync(LOG_FILE, path.join(DATA, 'oompas-older.log')); logBytes = 0; }
+    fs.appendFileSync(LOG_FILE, s); logBytes += s.length;
+  } catch {}
+};
+log(`OOMPAS Box ${app.getVersion()} starting on ${process.platform} ${process.arch}`);
 
 function get(urlPath, ms = 1200) {
   return new Promise(resolve => {
@@ -176,27 +196,23 @@ async function startServer() {
   await Promise.race([done, new Promise((_, rej) => setTimeout(() => rej(new Error('The server took too long to start.\n' + LOG.slice(-6).join('\n'))), 90000))]);
 }
 
-// Looks for a newer engine; if there is one, switches to it (server restart + window reload).
+// Looks for a newer engine and gets it ready; it's used the next time OOMPAS Box opens
+// (never swapped in while you watch).
+let engineReady = null;
 async function checkEngine(manual = false) {
   if (external || (!PACKED && !process.env.OOMPAS_LIVE_ENGINE)) return null;
   try {
-    const v = await live.check(engine);
+    const v = engineReady || await live.check(engine);
     if (!v) { if (manual) log('Engine is up to date.'); return null; }
-    swapping = true;
-    await stopServer();
-    engine = live.choose(); SERVER_DIR = engine.dir;
-    try { await startServer(); }
-    catch (e) { log('New engine failed: ' + e.message); live.markBad(); engine = live.bundled(); SERVER_DIR = engine.dir; await startServer(); }
-    swapping = false;
-    win?.loadURL(`http://127.0.0.1:${PORT}/tv/`);
-    if (Notification.isSupported()) new Notification({ title: 'OOMPAS Box', body: `Updated to ${engine.version}` }).show();
+    engineReady = v;
+    log(`Engine ${v} is ready; it starts next time OOMPAS Box opens.`);
     return v;
   } catch (e) {
-    swapping = false;
     log('Engine update check: ' + e.message);
     return null;
   }
 }
+function restartApp() { app.relaunch(); app.quit(); }
 
 async function stopServer() {
   if (!server) return;
@@ -235,6 +251,9 @@ function createWindow() {
     icon: path.join(__dirname, 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true, backgroundThrottling: false },
   });
+  win.webContents.on('render-process-gone', (e, d) => log(`Window process stopped: ${d.reason} (${d.exitCode})`));
+  win.on('unresponsive', () => log('Window stopped responding'));
+  win.on('responsive', () => log('Window responding again'));
   win.loadFile(path.join(__dirname, 'loading.html'));
   win.once('ready-to-show', () => { if (sb?.maximized) win.maximize(); win.show(); });
   for (const ev of ['resize', 'move', 'maximize', 'unmaximize']) win.on(ev, rememberBounds);
@@ -277,6 +296,7 @@ function buildMenu() {
     { label: 'Help', submenu: [
       { label: 'Check for Updates\u2026', click: () => checkForUpdatesNow() },
       { label: 'Server Log', click: () => showLog() },
+      { label: 'Show Log File', click: () => shell.showItemInFolder(LOG_FILE) },
       { label: 'About OOMPAS Box', click: () => dialog.showMessageBox({ title: 'OOMPAS Box', message: `OOMPAS Box ${engine.version}`,
         detail: `App ${app.getVersion()}, engine ${engine.version}${engine.live ? ' (updated)' : ''}\nData: ${DATA}\nFFmpeg: ${FFMPEG}\n\nVideo from the Internet Archive. Spelunkr channels from spelunkr.tv. Free IPTV lists from iptv-org.` }) },
     ] },
@@ -340,6 +360,7 @@ ipcMain.on('fit-window', (e, w, h) => {
   setPictureSize(w, h);
 });
 
+app.on('child-process-gone', (e, d) => log(`Helper process stopped: ${d.type} ${d.reason} (${d.exitCode})`));
 app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
 app.whenReady().then(async () => {
   buildMenu();
@@ -348,8 +369,16 @@ app.whenReady().then(async () => {
   try {
     await startServer();
     win?.loadURL(`http://127.0.0.1:${PORT}/tv/`);
-    setTimeout(() => checkEngine(), 20000);
+    setTimeout(() => checkEngine(), 60000);
     setInterval(() => checkEngine(), 3 * 3600e3);
+    // A line every 5 minutes on memory, to tell slowdowns apart in the log.
+    setInterval(() => {
+      try {
+        const mb = Math.round(app.getAppMetrics().reduce((s, m) => s + (m.memory?.workingSetSize || 0), 0) / 1024);
+        const sys = process.getSystemMemoryInfo();
+        log(`Memory: app ${mb} MB, computer free ${Math.round(sys.free / 1024)} of ${Math.round(sys.total / 1024)} MB`);
+      } catch {}
+    }, 5 * 60e3).unref();
   } catch (e) {
     if (e.message === 'port busy') return;
     await dialog.showMessageBox({ type: 'error', title: 'OOMPAS Box', message: 'The OOMPAS server couldn’t start.', detail: String(e.message).slice(0, 1500) });
