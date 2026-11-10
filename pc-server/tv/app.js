@@ -243,10 +243,18 @@ async function scanList(job) {
   });
   try {
     p.mute();
+    const listed = async ms => { for (let i = 0; i < ms / 250; i++) { await sleep(250); const l = p.getPlaylist() || []; if (l.length) return l; } return []; };
     p.cuePlaylist({ list: job.list, listType: 'playlist' });
-    let ids = [];
-    for (let i = 0; i < 60 && !ids.length; i++) { await sleep(250); ids = p.getPlaylist() || []; if (err) break; }
-    if (!ids.length) throw new Error('no videos found (is the playlist public?)');
+    let ids = await listed(6000);
+    if (!ids.length) { err = null; p.loadPlaylist({ list: job.list, listType: 'playlist' }); ids = await listed(10000); p.stopVideo(); }
+    const titles = new Map();
+    if (!ids.length) {                         // the player won't list it: YouTube's feed has the newest 15
+      const f = await api('/api/youtube/feed?list=' + encodeURIComponent(job.list)).catch(e => ({ error: e.message }));
+      for (const v of f.videos || []) titles.set(v.id, v.title);
+      ids = [...titles.keys()];
+      if (ids.length) toast(`YouTube: only the newest ${ids.length} videos of ${job.name || 'this channel'} for now`, 5000);
+    }
+    if (!ids.length) throw new Error('no videos found (is it public, with videos?)');
     job.total = ids.length; job.done = 0;
     const out = [];
     let lastSend = Date.now();
@@ -260,7 +268,7 @@ async function scanList(job) {
         for (let i = 0; i < 40 && !dur && err == null; i++) { await sleep(200); dur = state === 1 ? p.getDuration() || 0 : 0; }
         p.pauseVideo();
       }
-      const title = (p.getVideoData && p.getVideoData()?.title) || '';
+      const title = (p.getVideoData && p.getVideoData()?.title) || titles.get(id) || '';
       out.push({ id, title, dur, bad: err != null || !dur });
       job.done++;
       if (S.mode === 'settings' && job.done % 5 === 0) renderSettings();

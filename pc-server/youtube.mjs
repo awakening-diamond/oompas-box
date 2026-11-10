@@ -72,7 +72,8 @@ export class YouTube {
     for (const b of this.builtins) {
       let c = this.channels.find(x => x.id === b.id);
       if (!c) { c = { id: b.id, list: '', link: '', videos: [], bad: [], scannedAt: 0, added: Date.now() }; this.channels.unshift(c); }
-      if (c.handle && c.handle.toLowerCase() !== b.handle.toLowerCase()) Object.assign(c, { list: '', videos: [], bad: [], scannedAt: 0 });   // a different YouTube channel now
+      if ((c.handle && c.handle.toLowerCase() !== b.handle.toLowerCase()) || (c.resolver || 0) < 2)   // another channel now, or looked up the old way
+        Object.assign(c, { list: '', videos: [], bad: [], scannedAt: 0, resolver: 2 });
       Object.assign(c, { name: b.name, dial: b.dial, handle: b.handle, link: `https://www.youtube.com/${b.handle}`, order: 'shuffle', builtin: true });
     }
     // Anything the user put on a built-in channel's number moves to the next free one from 300.
@@ -103,14 +104,28 @@ export class YouTube {
     this.cache.clear();
   }
 
+  // The newest videos of a playlist (up to 15), from YouTube's public feed: a fallback for when the
+  // embedded player won't list a channel's uploads.
+  async feed(list) {
+    if (!/^[\w-]{10,}$/.test(list)) throw new Error('bad list');
+    const r = await this.fetch(`https://www.youtube.com/feeds/videos.xml?playlist_id=${list}`);
+    if (!r.ok) throw new Error(`YouTube said ${r.status}`);
+    const xml = await r.text();
+    return [...xml.matchAll(/<entry>[\s\S]*?<yt:videoId>([\w-]{11})<\/yt:videoId>[\s\S]*?<title>([^<]*)<\/title>/g)]
+      .map(m => ({ id: m[1], title: m[2].replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>') }));
+  }
+
   // The channel id for an @handle (or an old /c/ or /user/ link), from the channel's public page.
   async resolveHandle(handle) {
     const fake = process.env.YT_HANDLES && JSON.parse(process.env.YT_HANDLES)[handle];   // tests
     if (fake) return { list: fake, name: '' };
-    const r = await this.fetch(`https://www.youtube.com/${handle}`, { headers: { 'accept-language': 'en' } });
+    const r = await this.fetch(`https://www.youtube.com/${handle}`, { headers: { 'accept-language': 'en', cookie: 'SOCS=CAI; CONSENT=YES+1' } });
     if (!r.ok) throw new Error(`YouTube said ${r.status} for ${handle}`);
     const html = await r.text();
-    const id = (html.match(/"(?:externalId|channelId)":"(UC[\w-]{22})"/) || html.match(/youtube\.com\/channel\/(UC[\w-]{22})/) || [])[1];
+    // The page names other channels too (recommendations), so go by the ones that are about this page.
+    const id = [/<link rel="canonical" href="https:\/\/www\.youtube\.com\/channel\/(UC[\w-]{22})"/, /"externalId":"(UC[\w-]{22})"/,
+                /<meta itemprop="(?:channelId|identifier)" content="(UC[\w-]{22})"/, /"browseId":"(UC[\w-]{22})"/]
+      .map(re => (html.match(re) || [])[1]).find(Boolean);
     if (!id) throw new Error(`Couldn’t find the channel ${handle}`);
     const name = (html.match(/<meta property="og:title" content="([^"]*)"/) || [])[1] || '';
     return { list: 'UU' + id.slice(2), name: name.replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"') };

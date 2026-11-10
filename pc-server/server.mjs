@@ -1763,6 +1763,11 @@ async function handleApp(bc, req, res, url) {
     sendJson(res, { ok: true, settings: SETTINGS });
     return true;
   }
+  if (p === '/api/youtube/feed') {
+    try { sendJson(res, { videos: await bc.youtube.feed(url.searchParams.get('list') || '') }); }
+    catch (e) { sendJson(res, { error: e.message }, 502); }
+    return true;
+  }
   if (p.startsWith('/api/youtube/') && req.method === 'POST') {
     if (!PRIVATE.test(addr)) { sendJson(res, { error: 'Only from your own network' }, 403); return true; }
     const yt = bc.youtube, b = await readJson(req, 4e6), act = p.slice(13);

@@ -1,3 +1,9 @@
+## OOMPAS Box 1.2.3
+
+- Fix: YouTube channels made from a channel (`youtube.com/@name`) couldn't find their videos. The channel lookup is more careful
+  (the page also names other channels), the video list gets a second way to load, and if YouTube still won't list them, the
+  channel starts with its newest 15 videos.
+
 ## OOMPAS Box 1.2.2
 
 - The built-in channel lists (channels 69 and 420, the 2000s Cable lineup) now update themselves from GitHub every few hours,
