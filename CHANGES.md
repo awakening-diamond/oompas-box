@@ -1,3 +1,9 @@
+## OOMPAS Box 1.4.2
+
+- Channels keep playing (and keep drawing, for OOMPAS Cast) when the OOMPAS Box window is covered by other windows,
+  minimized or not focused. YouTube's player no longer pauses itself, and if anything pauses a channel it carries on
+  where the schedule is.
+
 ## OOMPAS Box 1.4.1
 
 - Fix: "Hide YouTube's on-screen extras" didn't work: YouTube's page refuses styles it didn't add itself. The app now uses

@@ -187,6 +187,10 @@ video.textTracks.addEventListener('addtrack', () => applyCaptions());
 let ccT = [];
 function captionsSoon() { ccT.forEach(clearTimeout); applyCaptions(); ccT = [800, 2500, 6000].map(ms => setTimeout(applyCaptions, ms)); }
 video.addEventListener('playing', () => captionsSoon());
+// Nothing in OOMPAS Box pauses a channel, so a pause from outside (the system, a covered window) gets undone.
+video.addEventListener('pause', () => {
+  setTimeout(() => { if (S.player && !S.yt && video.paused && !video.ended && video.currentSrc) video.play().catch(() => {}); }, 500);
+});
 function toggleCaptions() {
   const on = !ccOn();
   S.settings = { ...(S.settings || {}), captions: on };
@@ -232,6 +236,7 @@ async function playYt(info, seq) {
   layout();
   const box = el('div'); $('#yt').innerHTML = ''; $('#yt').append(box);
   let started = false;
+  const t0 = Date.now();
   const watchdog = setTimeout(() => { if (!started && seq === tuneSeq) noSignal('No picture from YouTube'); }, 20000);
   // If this video already ended a moment ago (its slot runs longer than the video), wait for the next one.
   if (ytEnded.id === info.videoId && Date.now() - ytEnded.at < 15000 && info.endMs) {
@@ -262,6 +267,15 @@ async function playYt(info, seq) {
           if (info.endMs) ytTimer = setTimeout(() => retune(0), Math.max(1000, info.endMs - Date.now() + 1500));
         }
         if (e.data === Y.PlayerState.ENDED) { ytEnded = { id: info.videoId, at: Date.now() }; retune(); }
+        // Nobody pauses a TV channel: if YouTube pauses (e.g. the window got covered), carry on, back on schedule.
+        if (e.data === Y.PlayerState.PAUSED && started) {
+          setTimeout(() => {
+            if (seq !== tuneSeq || S.yt !== p || p.getPlayerState?.() !== Y.PlayerState.PAUSED) return;
+            const want = info.start + (Date.now() - t0) / 1000;
+            if (Math.abs((p.getCurrentTime?.() || 0) - want) > 5) p.seekTo(want, true);
+            p.playVideo();
+          }, 400);
+        }
       },
       onError: () => {
         if (seq !== tuneSeq) return;

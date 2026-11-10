@@ -32,6 +32,12 @@ let SERVER_DIR = engine.dir;
 let swapping = false;
 
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+// Keep playing (and drawing, for OOMPAS Cast and other capture) when the window is covered,
+// minimized or not focused: no "hidden window" slowdowns, and players never think they're hidden.
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('disable-background-timer-throttling');
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion,BackgroundVideoTrackOptimization,IntensiveWakeUpThrottling');
 
 // ------------------------------------------------------------ updates (GitHub Releases)
 // Windows: downloads in the background and installs when you restart the app.
@@ -251,7 +257,11 @@ function createWindow() {
     icon: path.join(__dirname, 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true, backgroundThrottling: false },
   });
-  win.webContents.on('did-frame-finish-load', (e, isMain) => { if (!isMain && ytClean) { styleYouTubeFrames(); setTimeout(styleYouTubeFrames, 1500); } });
+  win.webContents.on('did-frame-finish-load', (e, isMain) => {
+    if (isMain) return;
+    alwaysVisible();
+    if (ytClean) { styleYouTubeFrames(); setTimeout(styleYouTubeFrames, 1500); }
+  });
   win.webContents.on('render-process-gone', (e, d) => log(`Window process stopped: ${d.reason} (${d.exitCode})`));
   win.on('unresponsive', () => log('Window stopped responding'));
   win.on('responsive', () => log('Window responding again'));
@@ -367,6 +377,21 @@ function styleYouTubeFrames() {
     if (/^https:\/\/www\.youtube(-nocookie)?\.com\/embed\//.test(f.url))
       f.executeJavaScript(js).catch(e => log('YouTube extras: ' + e.message));
 }
+// YouTube's player pauses itself when its page says it's hidden. Tell its frames they're always shown.
+function alwaysVisible() {
+  if (!win || win.isDestroyed()) return;
+  const js = `(() => { if (window.__oompasVisible) return; window.__oompasVisible = true;
+    try { Object.defineProperty(document, 'visibilityState', { get: () => 'visible', configurable: true });
+          Object.defineProperty(document, 'hidden', { get: () => false, configurable: true });
+          Object.defineProperty(document, 'webkitHidden', { get: () => false, configurable: true }); } catch {}
+    for (const t of ['visibilitychange', 'webkitvisibilitychange']) document.addEventListener(t, e => e.stopImmediatePropagation(), true);
+    window.addEventListener('blur', e => e.stopImmediatePropagation(), true);
+    window.addEventListener('pagehide', e => e.stopImmediatePropagation(), true);
+  })()`;
+  for (const f of win.webContents.mainFrame.framesInSubtree)
+    if (/^https:\/\/www\.youtube(-nocookie)?\.com\/embed\//.test(f.url)) f.executeJavaScript(js).catch(() => {});
+}
+
 ipcMain.on('yt-clean', (e, on) => { ytClean = !!on; styleYouTubeFrames(); });
 
 ipcMain.on('fullscreen', () => { if (win) win.setFullScreen(!win.isFullScreen()); });
