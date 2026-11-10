@@ -1,11 +1,13 @@
-# Builds OOMPAS Box for Windows and Mac and publishes a GitHub release when a version tag is pushed:
-#   (bump "version" in desktop/package.json, add notes to CHANGES.md)  git tag 1.2.3 && git push origin 1.2.3
+# Builds OOMPAS Box for Windows and Mac and publishes a GitHub release whenever the version in
+# desktop/package.json changes on main (and there's no release for it yet). So a release is:
+#   bump "version" in desktop/package.json, add notes to CHANGES.md, commit, push.
 # The installed apps pick the release up through their update check.
 name: Release
 
 on:
   push:
-    tags: ['v*', '[0-9]*']
+    branches: [main]
+    paths: [desktop/package.json]
   workflow_dispatch:
 
 permissions:
@@ -15,7 +17,24 @@ env:
   FFMPEG_STATIC: https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1
 
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      exists: ${{ steps.v.outputs.exists }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v=$(node -p "require('./desktop/package.json').version")
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          if gh release view "$v" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then echo "exists=true" >> "$GITHUB_OUTPUT"; echo "Release $v already exists"; else echo "exists=false" >> "$GITHUB_OUTPUT"; fi
+
   build:
+    needs: version
+    if: needs.version.outputs.exists != 'true'
     strategy:
       fail-fast: true
       matrix:
@@ -36,11 +55,6 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: desktop/package-lock.json
-      - name: Check the tag matches the app version
-        if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          v=$(node -p "require('./package.json').version")
-          [ "$v" = "${GITHUB_REF_NAME#v}" ] || { echo "Tag ${GITHUB_REF_NAME} but desktop/package.json says $v"; exit 1; }
       - name: Get FFmpeg
         run: |
           get() { mkdir -p "ffmpeg/$2"; curl -fsSL "$FFMPEG_STATIC/$1.gz" | gunzip > "ffmpeg/$2/$3"; chmod +x "ffmpeg/$2/$3"; }
@@ -60,8 +74,10 @@ jobs:
           if-no-files-found: error
 
   publish:
-    needs: build
+    needs: [version, build]
     runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -70,14 +86,15 @@ jobs:
           merge-multiple: true
       - name: Release notes from CHANGES.md
         run: |
-          v="${GITHUB_REF_NAME#v}"
+          v="$VERSION"
           awk -v h="## OOMPAS Box $v" '$0==h{on=1;next} /^## /{if(on)exit} on' CHANGES.md > notes.md
           [ -s notes.md ] || echo "OOMPAS Box $v" > notes.md
           ls -la out; cat notes.md
       - uses: softprops/action-gh-release@v2
         with:
-          name: OOMPAS Box ${{ github.ref_name }}
-          tag_name: ${{ github.ref_name }}
+          name: OOMPAS Box ${{ needs.version.outputs.version }}
+          tag_name: ${{ needs.version.outputs.version }}
+          target_commitish: ${{ github.sha }}
           body_path: notes.md
           files: out/*
           make_latest: true

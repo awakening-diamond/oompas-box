@@ -173,8 +173,8 @@ OOMPAS Box checks for new versions by itself ([Releases](https://github.com/awak
 push: every installed app picks it up, no release needed.
 
 **Making a release:** bump `"version"` in `desktop/package.json`, add notes under a `## OOMPAS Box x.y.z` heading in
-`CHANGES.md`, commit, then `git tag x.y.z && git push origin x.y.z`. GitHub Actions builds Windows and Mac and publishes the
-release (see `.github/workflows/release.yml`).
+`CHANGES.md`, commit and push. GitHub Actions sees the new version, builds Windows and Mac and publishes the release
+(see `.github/workflows/release.yml`); it skips versions that already have a release.
 
 ## Casting to a CRT
 
