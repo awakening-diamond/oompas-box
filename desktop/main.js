@@ -2,17 +2,19 @@
 // Starts the OOMPAS engine (pc-server/server.mjs) with a bundled FFmpeg, then shows
 // the TV interface (served by the server at /tv/) in a full-window player. Quitting the app
 // stops the server and everything it started.
-const { app, BrowserWindow, Menu, shell, ipcMain, dialog, powerSaveBlocker, screen } = require('electron');
+const { app, BrowserWindow, Menu, shell, ipcMain, dialog, powerSaveBlocker, screen, Notification } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const http = require('node:http');
 const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 
+const { LiveUpdate } = require('./live-update');
+
 const PORT = Number(process.env.OOMPAS_PORT || 8090);
 const PACKED = app.isPackaged;
-const SERVER_DIR = PACKED ? path.join(process.resourcesPath, 'pc-server')
-                          : path.join(__dirname, '..', 'pc-server');
+const BUNDLED_SERVER = PACKED ? path.join(process.resourcesPath, 'pc-server')
+                              : path.join(__dirname, '..', 'pc-server');
 const FFMPEG = (() => {
   const exe = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
   const bundled = PACKED ? path.join(process.resourcesPath, 'ffmpeg', exe)
@@ -23,6 +25,11 @@ const DATA = app.getPath('userData');
 const TOKEN = crypto.randomBytes(16).toString('hex');
 // Your own copy of the channel lineup (File > Edit Channel Lineup); used instead of the built-in one.
 const LINEUP = path.join(DATA, 'oompas-channels.json');
+// The engine (pc-server) can update itself between app releases; see live-update.js.
+const live = new LiveUpdate({ dataDir: DATA, bundledDir: BUNDLED_SERVER, shellVersion: app.getVersion(), log: m => log(m) });
+let engine = PACKED || process.env.OOMPAS_LIVE_ENGINE ? live.choose() : live.bundled();
+let SERVER_DIR = engine.dir;
+let swapping = false;
 
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
@@ -78,7 +85,9 @@ function setupUpdates() {
   setInterval(check, 6 * 3600e3);
   return true;
 }
-function checkForUpdatesNow() {
+async function checkForUpdatesNow() {
+  const v = await checkEngine(true);
+  if (v) return dialog.showMessageBox({ title: 'OOMPAS Box', message: `Updated to ${v}.`, detail: 'The new version is already running.' });
   if (!setupUpdates.done) setupUpdates.done = setupUpdates() ? 'on' : 'off';
   if (setupUpdates.done !== 'on') {
     return dialog.showMessageBox({ title: 'OOMPAS Box', message: 'Updates aren\u2019t set up in this copy.',
@@ -125,6 +134,8 @@ async function startServer() {
   const readme = path.join(DATA, 'music', 'PUT-MUSIC-HERE.txt');
   if (!fs.existsSync(readme)) fs.writeFileSync(readme, 'Put music files (mp3, flac, ogg, m4a, wav) here for the Guide and Weather channels.\r\n');
 
+  const startedAt = Date.now(), usingLive = engine.live;
+  log(`Engine ${engine.version}${engine.live ? ' (updated)' : ''}`);
   server = spawn(process.execPath, [path.join(SERVER_DIR, 'server.mjs')], {
     cwd: SERVER_DIR, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', PORT: String(PORT), FFMPEG,
@@ -143,11 +154,19 @@ async function startServer() {
   };
   server.stdout.on('data', onData);
   server.stderr.on('data', onData);
+  let up = false;
+  done.then(() => { up = true; }, () => {});
   server.on('exit', code => {
     log(`Server stopped (${code}).`);
     server = null;
+    // A downloaded engine that falls over while starting: go back to the built-in one.
+    if (usingLive && !up && !quitting && !swapping && Date.now() - startedAt < 60000) {
+      live.markBad(); engine = live.bundled(); SERVER_DIR = engine.dir;
+      startServer().then(ready, failed);
+      return;
+    }
     failed(new Error(LOG.slice(-6).join('\n')));
-    if (!quitting) {
+    if (!quitting && !swapping) {
       dialog.showMessageBox({ type: 'error', title: 'OOMPAS Box', message: 'The OOMPAS server stopped.',
         detail: LOG.slice(-8).join('\n'), buttons: ['Restart it', 'Quit'] }).then(r => {
         if (r.response === 0) startServer().then(() => win?.reload()).catch(() => {}); else app.quit();
@@ -155,6 +174,28 @@ async function startServer() {
     }
   });
   await Promise.race([done, new Promise((_, rej) => setTimeout(() => rej(new Error('The server took too long to start.\n' + LOG.slice(-6).join('\n'))), 90000))]);
+}
+
+// Looks for a newer engine; if there is one, switches to it (server restart + window reload).
+async function checkEngine(manual = false) {
+  if (external || (!PACKED && !process.env.OOMPAS_LIVE_ENGINE)) return null;
+  try {
+    const v = await live.check(engine);
+    if (!v) { if (manual) log('Engine is up to date.'); return null; }
+    swapping = true;
+    await stopServer();
+    engine = live.choose(); SERVER_DIR = engine.dir;
+    try { await startServer(); }
+    catch (e) { log('New engine failed: ' + e.message); live.markBad(); engine = live.bundled(); SERVER_DIR = engine.dir; await startServer(); }
+    swapping = false;
+    win?.loadURL(`http://127.0.0.1:${PORT}/tv/`);
+    if (Notification.isSupported()) new Notification({ title: 'OOMPAS Box', body: `Updated to ${engine.version}` }).show();
+    return v;
+  } catch (e) {
+    swapping = false;
+    log('Engine update check: ' + e.message);
+    return null;
+  }
 }
 
 async function stopServer() {
@@ -236,8 +277,8 @@ function buildMenu() {
     { label: 'Help', submenu: [
       { label: 'Check for Updates\u2026', click: () => checkForUpdatesNow() },
       { label: 'Server Log', click: () => showLog() },
-      { label: 'About OOMPAS Box', click: () => dialog.showMessageBox({ title: 'OOMPAS Box', message: `OOMPAS Box ${app.getVersion()}`,
-        detail: `Data: ${DATA}\nFFmpeg: ${FFMPEG}\n\nVideo from the Internet Archive. Spelunkr channels from spelunkr.tv. Free IPTV lists from iptv-org.` }) },
+      { label: 'About OOMPAS Box', click: () => dialog.showMessageBox({ title: 'OOMPAS Box', message: `OOMPAS Box ${engine.version}`,
+        detail: `App ${app.getVersion()}, engine ${engine.version}${engine.live ? ' (updated)' : ''}\nData: ${DATA}\nFFmpeg: ${FFMPEG}\n\nVideo from the Internet Archive. Spelunkr channels from spelunkr.tv. Free IPTV lists from iptv-org.` }) },
     ] },
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
@@ -307,6 +348,8 @@ app.whenReady().then(async () => {
   try {
     await startServer();
     win?.loadURL(`http://127.0.0.1:${PORT}/tv/`);
+    setTimeout(() => checkEngine(), 20000);
+    setInterval(() => checkEngine(), 3 * 3600e3);
   } catch (e) {
     if (e.message === 'port busy') return;
     await dialog.showMessageBox({ type: 'error', title: 'OOMPAS Box', message: 'The OOMPAS server couldn’t start.', detail: String(e.message).slice(0, 1500) });

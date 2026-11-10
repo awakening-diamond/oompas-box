@@ -24,7 +24,16 @@ import { Worker } from 'node:worker_threads';
 import { Iptv, CATALOG, proxy as iptvProxy, proxyUrl } from './iptv.mjs';
 import { YouTube } from './youtube.mjs';
 
+// The app's updater loads a downloaded engine with this set, to make sure everything is there.
+if (process.env.OOMPAS_SMOKE) {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const missing = ['tv/index.html', 'tv/app.js', 'tv/app.css', 'paulstretch.mjs', 'lineups/youtube.json', 'oompas-channels.json'].filter(f => !fs.existsSync(path.join(here, f)));
+  console.log(missing.length ? 'smoke missing ' + missing.join(', ') : 'smoke ok');
+  process.exit(missing.length ? 1 : 0);
+}
+
 const HERE = path.dirname(fileURLToPath(import.meta.url));
+const ENGINE_VERSION = (() => { try { return JSON.parse(fs.readFileSync(path.join(HERE, 'version.json'), 'utf8')).version; } catch { return ''; } })();
 
 // ---------------------------------------------------------------- settings
 const CFG = {
@@ -1733,7 +1742,7 @@ async function handleApp(bc, req, res, url) {
   }
   if (!p.startsWith('/api/')) return false;
   if (p === '/api/state') {
-    sendJson(res, { name: 'OOMPAS Box', port: CFG.port, settings: SETTINGS,
+    sendJson(res, { name: 'OOMPAS Box', engine: ENGINE_VERSION, port: CFG.port, settings: SETTINGS,
                     iptv: bc.iptv?.status() || [], iptvChannels: bc.iptv?.channels.length || 0, iptvCountries: bc.iptv?.countries || {}, iptvCategories: bc.iptv?.categories || {}, iptvLanguages: bc.iptv?.languages || {}, iptvCheck: bc.iptv?.check || null, iptvGuides: bc.iptv?.guideCount || 0,
                     youtube: bc.youtube?.status() || [],
                     catalog: CATALOG, watching: [...STREAMS].map(s => ({ addr: s.addr, viewer: s.viewer, dial: s.dial })),

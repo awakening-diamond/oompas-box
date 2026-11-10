@@ -162,19 +162,26 @@ and the Program Info view. Block names, labels and `"list": "block" | "title" | 
 
 ## Keeping it up to date
 
-OOMPAS Box checks for new versions by itself ([Releases](https://github.com/awakening-diamond/oompas-box/releases)), and
-**Help → Check for Updates** checks right away.
-- **Windows:** the update downloads in the background and installs when you restart the app (it asks).
-- **Mac:** the app isn't signed by Apple, so it can't replace itself. It tells you a new version is out and opens the download page;
-  replace the app in Applications. Your settings and channels stay either way.
+OOMPAS Box has two parts that update separately:
 
-**Channel list fixes come without an update.** The built-in lists in `pc-server/lineups/` (`youtube.json` for channels 69 and
-420, `2000s-cable.json`) are also read from this repo's main branch every few hours. Edit one, raise its `"updated"` date, and
-push: every installed app picks it up, no release needed.
+- **The engine** (`pc-server/`: channels, guide, YouTube, IPTV, the TV screens) updates itself. A few times a day the app
+  checks this repo's `main` branch; when `pc-server/version.json` has a newer version, it downloads that folder, checks that it
+  loads, and switches to it. The picture blinks for a couple of seconds and you're back on the same channel. No installer. If a
+  new engine ever fails to start, the app goes back to the one it came with. **Help → Check for Updates** checks right away.
+- **The app around it** (Electron, FFmpeg, the window and menus in `desktop/`) updates through
+  [Releases](https://github.com/awakening-diamond/oompas-box/releases). Windows downloads it in the background and installs when
+  you restart (it asks). On a Mac the app isn't signed by Apple, so it tells you and opens the download page; replace the app in
+  Applications. Your settings and channels stay either way.
 
-**Making a release:** bump `"version"` in `desktop/package.json`, add notes under a `## OOMPAS Box x.y.z` heading in
-`CHANGES.md`, commit and push. GitHub Actions sees the new version, builds Windows and Mac and publishes the release
-(see `.github/workflows/release.yml`); it skips versions that already have a release.
+**Channel list fixes** are lighter still: the built-in lists in `pc-server/lineups/` (`youtube.json` for channels 69 and 420,
+`2000s-cable.json`) are read from `main` every few hours on their own. Edit one, raise its `"updated"` date, push.
+
+**For whoever maintains it:**
+- Engine change: edit `pc-server/`, raise `"version"` in `pc-server/version.json`, add notes to `CHANGES.md`, push to `main`.
+  If the engine needs something new from the app, raise `"minShell"` too and release the app first.
+- App change: raise `"version"` in `desktop/package.json` (and the engine version, so they match), add notes under
+  `## OOMPAS Box x.y.z` in `CHANGES.md`, push. GitHub Actions builds Windows and Mac and publishes the release
+  (`.github/workflows/release.yml`); it skips versions that already have a release.
 
 ## Casting to a CRT
 

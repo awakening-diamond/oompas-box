@@ -1,3 +1,9 @@
+## OOMPAS Box 1.3.0
+
+- **Updates without reinstalling.** The engine (channels, guide, YouTube, IPTV, the TV screens) now updates itself from GitHub
+  in the background and switches over in a couple of seconds, no installer and no restart. The installer is only needed when the
+  app around it changes. Help → About shows both versions.
+
 ## OOMPAS Box 1.2.3
 
 - Fix: YouTube channels made from a channel (`youtube.com/@name`) couldn't find their videos. The channel lookup is more careful
