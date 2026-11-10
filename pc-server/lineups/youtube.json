@@ -1,18 +1,20 @@
 {
  "name": "Built-in YouTube channels",
- "updated": "2026-11-10",
+ "updated": "2026-11-10T10:20:00Z",
  "channels": [
   {
    "id": "hb69",
    "handle": "@Hungrybear9562",
    "name": "HungryBear 69",
-   "dial": 69
+   "dial": 69,
+   "bug": "double-rainbow-tv.png"
   },
   {
    "id": "hb420",
    "handle": "@Hungrybear9562",
    "name": "HungryBear 420",
-   "dial": 420
+   "dial": 420,
+   "bug": "double-rainbow-tv.png"
   }
  ]
 }

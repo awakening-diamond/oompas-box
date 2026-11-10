@@ -1672,7 +1672,7 @@ async function appChannels(bc) {
     const pr = p => p ? { title: p.title, sub: p.sub || (p.eps ? nowLine(p, now()) : '') || '', desc: p.desc || p.description || '', kindLine: kindLine(p), movie: isMovie(p), startMs: p.startMs, endMs: p.endMs, live: !!p.live } : null;
     return { dial: c.dial, id: c.id, name: c.name, call: c.call || callSign(c.name), color: c.color,
              ...sectionOf(c), logo: c.logo || '', group: c.group || '', cats: c.cats || [], country: c.country || '', description: c.description || '',
-             langs: c.langs || [], tags: c.tags || [], health: c.health || '', healthWhy: c.healthWhy || '',
+             langs: c.langs || [], tags: c.tags || [], health: c.health || '', healthWhy: c.healthWhy || '', bug: c.bug || '',
              now: pr(progs[0]), next: pr(progs[1]) };
   }));
 }

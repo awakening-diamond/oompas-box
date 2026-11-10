@@ -76,6 +76,8 @@ async function tune(dial, opts = {}) {
   if (!c) { toast(`No channel ${dial}`); return; }
   if (S.cur && S.cur.dial !== c.dial) S.prev = S.cur.dial;
   S.cur = c;
+  const bug = $('#bug');
+  if (c.bug) { if (bug.getAttribute('src') !== c.bug) bug.src = c.bug; bug.hidden = false; } else bug.hidden = true;
   const seq = ++tuneSeq;
   stopPlayer();
   $('#nosignal').hidden = true;

@@ -1,3 +1,8 @@
+## OOMPAS Box 1.3.6 (engine update)
+
+- Channels 69 and 420 show the **Double Rainbow TV** logo in the bottom-right corner, see-through like a TV station's.
+  (Any built-in channel can have one: a `"bug"` image name in `lineups/youtube.json`, the image in `tv/bugs/`.)
+
 ## OOMPAS Box 1.3.5 (engine update)
 
 - Channels 69 and 420 can now follow one **shared video list** published in the repo, so everyone with OOMPAS Box gets the

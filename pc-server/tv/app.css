@@ -29,6 +29,9 @@ button { font: inherit; }
 #yt iframe { width: 100%; height: 100%; border: 0; display: block; pointer-events: none; }
 #pic.yt #yt { display: block; }
 #pic.yt #video { display: none; }
+/* A channel's logo in the corner, like a TV station's. */
+#bug { position: absolute; right: 4%; bottom: 5%; width: 19%; max-width: 300px; opacity: .55; pointer-events: none;
+       filter: drop-shadow(0 0 2px rgba(0, 0, 0, .55)); }
 #ytscan { position: fixed; left: -4000px; top: 0; width: 320px; height: 180px; opacity: 0; pointer-events: none; }
 #video { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: fill; display: block; background: #000; }
 #static { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; opacity: 0; transition: opacity .2s; pointer-events: none; }

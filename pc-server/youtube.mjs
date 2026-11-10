@@ -77,7 +77,8 @@ export class YouTube {
       if (!c) { c = { id: b.id, list: '', link: '', videos: [], bad: [], scannedAt: 0, added: Date.now() }; this.channels.unshift(c); }
       if ((c.handle && c.handle.toLowerCase() !== b.handle.toLowerCase()) || (c.resolver || 0) < 2)   // another channel now, or looked up the old way
         Object.assign(c, { list: '', videos: [], bad: [], scannedAt: 0, resolver: 2 });
-      Object.assign(c, { name: b.name, dial: b.dial, handle: b.handle, link: `https://www.youtube.com/${b.handle}`, order: 'shuffle', builtin: true });
+      Object.assign(c, { name: b.name, dial: b.dial, handle: b.handle, link: `https://www.youtube.com/${b.handle}`, order: 'shuffle', builtin: true,
+                         bug: /^[\w.-]+\.(png|webp|svg)$/.test(b.bug || '') ? b.bug : '' });
       const pub = Object.entries(this.published).find(([h]) => h.toLowerCase() === b.handle.toLowerCase())?.[1];
       if (pub?.videos?.length) {
         Object.assign(c, { list: pub.list, published: true, bad: [], scannedAt: Date.now(), scanV: 99,
@@ -211,7 +212,7 @@ export class YouTube {
   lineupChannels() {
     return this.channels.filter(c => c.dial).map(c => ({
       dial: c.dial, id: 'yt-' + c.id, ytId: c.id, name: c.name, call: c.name.replace(/[^A-Za-z0-9]/g, '').slice(0, 5).toUpperCase() || 'YT',
-      color: COLORS[c.dial % COLORS.length], kind: 'youtube', list: 'YouTube', cats: ['YouTube'], group: 'YouTube',
+      color: COLORS[c.dial % COLORS.length], kind: 'youtube', bug: c.bug ? `/tv/bugs/${c.bug}` : '', list: 'YouTube', cats: ['YouTube'], group: 'YouTube',
       description: this.playable(c).length ? `${this.playable(c).length} videos from YouTube` : 'Not scanned yet',
     }));
   }
