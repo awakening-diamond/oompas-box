@@ -46,6 +46,19 @@ With a mouse: move it for channel and menu buttons, scroll for volume, double-cl
 
 The app keeps its data (settings, schedules, your music for the Guide channel) in its data folder: **File → Open Data Folder**.
 
+### YouTube channels
+
+Settings → YouTube → **Add a YouTube channel…**: paste a YouTube playlist link (`youtube.com/playlist?list=…`) or a channel
+(`youtube.com/@name`, which uses that channel's uploads), and optionally a name and channel number (otherwise the next free number
+from 300). The app reads the videos' titles and lengths in the background (up to 200 videos; a minute or two), then plays them
+on a schedule like TV: tune in and you're partway through whatever is "on", and the guide lists what's next. **Shuffled** (the
+default) mixes the order each time through the list; **In order** plays it straight. It re-reads the list once a week to pick up
+new videos.
+
+Videos play in YouTube's own embedded player, so YouTube's ads still play (unless you have Premium), and videos whose uploader
+doesn't allow playing outside YouTube are skipped. Nothing is downloaded. The Trim bars picture shape doesn't apply to YouTube
+channels; the others do.
+
 ### IPTV (optional)
 
 Settings → IPTV:

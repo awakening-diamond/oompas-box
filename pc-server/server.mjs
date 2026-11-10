@@ -22,6 +22,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { OompasNet, hash32, rng, parseDuration, shorten } from './oompas.mjs';
 import { Worker } from 'node:worker_threads';
 import { Iptv, CATALOG, proxy as iptvProxy, proxyUrl } from './iptv.mjs';
+import { YouTube } from './youtube.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -191,6 +192,7 @@ class Broadcast {
   async channelByDial(dial) {
     const l = await this.lineup();
     const c = l.channels.find(c => String(c.dial) === String(dial))
+      || this.youtube?.lineupChannels().find(c => String(c.dial) === String(dial))
       || this.iptv?.channels.find(c => String(c.dial) === String(dial));
     if (!c) throw Object.assign(new Error('No channel ' + dial), { status: 404 });
     return this.channel(c.id);
@@ -198,6 +200,11 @@ class Broadcast {
 
   // A channel ready to play. Spelunkr channels (and mirrors of them) carry a playlist.
   async channel(id) {
+    if (String(id).startsWith('yt-')) {
+      const c = this.youtube?.lineupChannels().find(x => x.id === id);
+      if (!c) throw Object.assign(new Error('No channel ' + id), { status: 404 });
+      return c;
+    }
     if (String(id).startsWith('iptv-')) {
       const c = this.iptv?.find(id);
       if (!c) throw Object.assign(new Error('No channel ' + id), { status: 404 });
@@ -283,6 +290,7 @@ class Broadcast {
   // A "plan" is one ffmpeg segment: what to show from time `at` until the
   // current program ends.
   async plan(channel, at) {
+    if (channel.kind === 'youtube') throw Object.assign(new Error('YouTube channels play in the OOMPAS Box app'), { status: 400 });
     if (channel.kind === 'iptv') {
       // A live stream: one long segment (it's re-opened every few hours).
       const p = this.iptv.programs(channel, at, at + 1)[0];
@@ -836,6 +844,7 @@ function nowLine(p, at) {
 // Every show in [from, until); station breaks are folded into the show before them.
 async function programsBetween(bc, channel, from, until) {
   if (channel.kind === 'iptv') return bc.iptv ? bc.iptv.programs(channel, from, until) : [];
+  if (channel.kind === 'youtube') return bc.youtube ? bc.youtube.programs(channel, from, until) : [];
   if (!channel.playlist) {
     if (channel.kind === 'guide' || channel.kind === 'weather') {
       const step = channel.kind === 'guide' ? 1800000 : 3600000, out = [];
@@ -1628,19 +1637,27 @@ const sendJson = (res, v, code = 200) => { res.writeHead(code, { 'content-type':
 
 function sectionOf(c) {
   if (c.kind === 'iptv') return { kind: 'iptv', section: c.list || 'IPTV' };
+  if (c.kind === 'youtube') return { kind: 'youtube', section: 'YouTube' };
   if (c.oompas) return { kind: 'oompas', section: 'OOMPAS Box' };
   return { kind: 'spelunkr', section: 'Spelunkr' };
 }
 
 // Every channel the app can show: OOMPAS Box and Spelunkr, then IPTV.
-async function appChannels(bc) {
+// Everything on the dial: our channels first, then YouTube, then IPTV (each skips a dial already taken).
+async function allChannels(bc) {
   const base = (await bc.lineup()).channels;
-  const ids = new Set(base.map(c => c.id)), dials = new Set(base.map(c => c.dial));
-  const all = [...base, ...(bc.iptv?.channels || []).filter(c => !ids.has(c.id) && !dials.has(c.dial))].sort((a, b) => a.dial - b.dial);
+  const dials = new Set(base.map(c => c.dial));
+  const yt = (bc.youtube?.lineupChannels() || []).filter(c => !dials.has(c.dial) && dials.add(c.dial));
+  return [...base, ...yt, ...(bc.iptv?.channels || []).filter(c => !dials.has(c.dial))].sort((a, b) => a.dial - b.dial);
+}
+const ready = (bc, c) => (c.kind === 'iptv' || c.kind === 'youtube' ? c : bc.channel(c.id));
+
+async function appChannels(bc) {
+  const all = await allChannels(bc);
   const at = now();
   return Promise.all(all.map(async c => {
     let progs = [];
-    try { progs = (await programsBetween(bc, c.kind === 'iptv' ? c : await bc.channel(c.id), at, at + 8 * 3600e3)).slice(0, 2); } catch {}
+    try { progs = (await programsBetween(bc, await ready(bc, c), at, at + 8 * 3600e3)).slice(0, 2); } catch {}
     const pr = p => p ? { title: p.title, sub: p.sub || (p.eps ? nowLine(p, now()) : '') || '', desc: p.desc || p.description || '', kindLine: kindLine(p), movie: isMovie(p), startMs: p.startMs, endMs: p.endMs, live: !!p.live } : null;
     return { dial: c.dial, id: c.id, name: c.name, call: c.call || callSign(c.name), color: c.color,
              ...sectionOf(c), logo: c.logo || '', group: c.group || '', cats: c.cats || [], country: c.country || '', description: c.description || '',
@@ -1649,14 +1666,26 @@ async function appChannels(bc) {
   }));
 }
 
+// Short videos make slivers in the guide grid: group them into blocks of 15 minutes or more.
+function foldShort(ps) {
+  const out = [];
+  for (const p of ps) {
+    const last = out.at(-1);
+    if (last && last.endMs - last.startMs < 15 * 60000 && !p.live) { last.endMs = p.endMs; last.n++; last.title = `${last.first} + ${last.n} more`; }
+    else out.push({ ...p, first: p.title, n: 0 });
+  }
+  return out;
+}
+
 async function appGuide(bc, dials, from, until) {
   const want = new Set(dials.map(String));
-  const base = (await bc.lineup()).channels;
-  const all = [...base, ...(bc.iptv?.channels || []).filter(c => !base.some(b => b.id === c.id))].filter(c => want.has(String(c.dial)));
+  const all = (await allChannels(bc)).filter(c => want.has(String(c.dial)));
   const out = {};
   await Promise.all(all.map(async c => {
     try {
-      out[c.dial] = (await programsBetween(bc, c.kind === 'iptv' ? c : await bc.channel(c.id), from, until))
+      let ps = await programsBetween(bc, await ready(bc, c), from, until);
+      if (c.kind === 'youtube') ps = foldShort(ps);
+      out[c.dial] = ps
         .map(p => ({ title: p.title, sub: p.sub || '', startMs: p.startMs, endMs: p.endMs, live: !!p.live }));
     } catch { out[c.dial] = []; }
   }));
@@ -1667,6 +1696,7 @@ function playInfo(bc, c, q) {
   const w = Math.min(1440, Math.max(320, Number(q.get('w')) || 960)) & ~1;
   const h = Math.min(1080, Math.max(240, Number(q.get('h')) || 720)) & ~1;
   const tune = `/tune/${c.dial}.ts?w=${w}&h=${h}`;
+  if (c.kind === 'youtube') return { mode: 'youtube', ...(bc.youtube.playAt(c, now()) || {}) };
   if (c.kind !== 'iptv') return { mode: 'ts', url: tune, aspect: '4:3' };
   const u = c.iptv.url;
   const opts = { ua: c.iptv.ua, referrer: c.iptv.referrer };
@@ -1703,6 +1733,7 @@ async function handleApp(bc, req, res, url) {
   if (p === '/api/state') {
     sendJson(res, { name: 'OOMPAS Box', port: CFG.port, settings: SETTINGS,
                     iptv: bc.iptv?.status() || [], iptvChannels: bc.iptv?.channels.length || 0, iptvCountries: bc.iptv?.countries || {}, iptvCategories: bc.iptv?.categories || {}, iptvLanguages: bc.iptv?.languages || {}, iptvCheck: bc.iptv?.check || null, iptvGuides: bc.iptv?.guideCount || 0,
+                    youtube: bc.youtube?.status() || [],
                     catalog: CATALOG, watching: [...STREAMS].map(s => ({ addr: s.addr, viewer: s.viewer, dial: s.dial })),
                     x264: !!CFG.x264, oompasReady: !!bc.oompas?.complete });
     return true;
@@ -1728,6 +1759,30 @@ async function handleApp(bc, req, res, url) {
     CFG.widescreen = SETTINGS.widescreen; CFG.bars = SETTINGS.bars !== false;
     if (JSON.stringify(SETTINGS.iptv) !== before) bc.iptv?.configure(SETTINGS.iptv);
     sendJson(res, { ok: true, settings: SETTINGS });
+    return true;
+  }
+  if (p.startsWith('/api/youtube/') && req.method === 'POST') {
+    if (!PRIVATE.test(addr)) { sendJson(res, { error: 'Only from your own network' }, 403); return true; }
+    const yt = bc.youtube, b = await readJson(req, 4e6), act = p.slice(13);
+    try {
+      if (act === 'add') {
+        let dial = Math.round(+b.dial) || 0;
+        const taken = new Set((await allChannels(bc)).filter(c => c.kind !== 'iptv').map(c => c.dial));
+        if (!dial) { dial = 300; while (taken.has(dial)) dial++; }
+        else if (taken.has(dial)) throw Object.assign(new Error(`Channel ${dial} is taken`), { status: 400 });
+        const c = await yt.add({ link: b.link, name: b.name, dial, order: b.order });
+        sendJson(res, { ok: true, channel: { id: c.id, list: c.list, dial: c.dial, name: c.name }, youtube: yt.status() });
+      } else if (act === 'update') {
+        if (b.dial != null) {
+          const taken = new Set((await allChannels(bc)).filter(c => c.kind !== 'iptv' && c.id !== 'yt-' + b.id).map(c => c.dial));
+          if (taken.has(+b.dial)) throw Object.assign(new Error(`Channel ${b.dial} is taken`), { status: 400 });
+        }
+        yt.update(b.id, b); sendJson(res, { ok: true, youtube: yt.status() });
+      } else if (act === 'remove') { yt.remove(b.id); sendJson(res, { ok: true, youtube: yt.status() }); }
+      else if (act === 'videos') { yt.setVideos(b.id, b.videos, b.done !== false); sendJson(res, { ok: true, youtube: yt.status() }); }
+      else if (act === 'bad') { yt.markBad(b.id, b.videoId); sendJson(res, { ok: true }); }
+      else sendJson(res, { error: 'not found' }, 404);
+    } catch (e) { sendJson(res, { error: e.message }, e.status || 500); }
     return true;
   }
   if (p === '/api/iptv/check' && req.method === 'POST') {
@@ -1780,6 +1835,7 @@ async function main() {
   }
   const bc = new Broadcast(engine, oompas);
   bc.iptv = new Iptv({ cacheDir: CFG.cacheDir, log });
+  bc.youtube = new YouTube({ dataDir: APP_DATA, log });
   applySettings(bc);
   setInterval(() => bc.iptv.refresh().catch(() => {}), 3600e3).unref();
   const l = await bc.lineup();

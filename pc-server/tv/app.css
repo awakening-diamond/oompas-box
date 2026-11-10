@@ -24,6 +24,12 @@ button { font: inherit; }
    placed by layout() in app.js so black bars can be zoomed past. */
 #screen { position: absolute; left: 0; top: 0; width: 100vw; height: 100vh; background: #000; overflow: hidden; }
 #pic { position: absolute; overflow: hidden; background: #000; left: 12.5%; top: 0; width: 75%; height: 100%; }
+/* YouTube channels play in YouTube's own player, in place of the video element. */
+#yt { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: none; background: #000; }
+#yt iframe { width: 100%; height: 100%; border: 0; display: block; pointer-events: none; }
+#pic.yt #yt { display: block; }
+#pic.yt #video { display: none; }
+#ytscan { position: fixed; left: -4000px; top: 0; width: 320px; height: 180px; opacity: 0; pointer-events: none; }
 #video { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: fill; display: block; background: #000; }
 #static { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; opacity: 0; transition: opacity .2s; pointer-events: none; }
 #static.on { opacity: .9; }
@@ -33,7 +39,7 @@ button { font: inherit; }
     radial-gradient(ellipse at center, rgba(0,0,0,0) 62%, rgba(0,0,0,.42) 100%),
     repeating-linear-gradient(to bottom, rgba(0,0,0,.20) 0, rgba(0,0,0,.20) 1px, rgba(0,0,0,0) 2px, rgba(0,0,0,0) 3px); }
 #screen.crt #pic { border-radius: 1.2rem / 1.4rem; }
-#screen.crt #video { filter: saturate(1.12) contrast(1.06) blur(.35px); }
+#screen.crt #video, #screen.crt #yt iframe { filter: saturate(1.12) contrast(1.06) blur(.35px); }
 
 
 #nosignal { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .5rem; pointer-events: none; }

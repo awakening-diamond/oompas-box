@@ -1,3 +1,8 @@
+## OOMPAS Box 1.2.0
+
+- New: **YouTube channels.** Make a channel from any YouTube playlist or YouTube channel; it plays on a schedule like TV, with
+  real titles and times in the guide. Settings → YouTube → Add a YouTube channel.
+
 ## OOMPAS Box 1.1.1
 
 - New: **TV guides for IPTV.** Real show listings from the free Pluto TV, Samsung TV Plus, Plex and Roku guides, matched to your

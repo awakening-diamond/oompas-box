@@ -65,6 +65,7 @@ let tuneSeq = 0;
 function stopPlayer() {
   try { S.player?.destroy(); } catch {}
   S.player = null;
+  stopYt();
   video.onplaying = video.onerror = video.onended = video.onwaiting = null;
   video.removeAttribute('src');
   try { video.load(); } catch {}
@@ -90,6 +91,7 @@ async function tune(dial, opts = {}) {
 }
 
 function play(info, seq, isFallback) {
+  if (info.mode === 'youtube') return playYt(info, seq);
   let started = false, failed = false;
   const fail = why => {
     if (seq !== tuneSeq || failed) return;
@@ -142,6 +144,138 @@ function play(info, seq, isFallback) {
   } else {
     video.src = abs(info.url); video.onerror = () => fail('Can’t play this stream'); go();
   }
+}
+
+// ------------------------------------------------------------ YouTube channels
+// Played in YouTube's own embedded player (with its own ads, if any). The server says which video
+// is on and how far in; when it ends we just tune again to get the next one.
+let ytApiP = null;
+function ytApi() {
+  if (window.YT?.Player) return Promise.resolve(window.YT);
+  ytApiP ??= new Promise((resolve, reject) => {
+    const prev = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => { prev?.(); resolve(window.YT); };
+    const sc = document.createElement('script');
+    sc.src = 'https://www.youtube.com/iframe_api';
+    sc.onerror = () => { ytApiP = null; reject(new Error('Couldn\u2019t reach YouTube')); };
+    document.head.append(sc);
+  });
+  return ytApiP;
+}
+const YT_VARS = () => ({ autoplay: 1, controls: 0, disablekb: 1, fs: 0, rel: 0, iv_load_policy: 3, playsinline: 1, cc_load_policy: 0, origin: location.origin });
+let ytTimer = 0;
+function stopYt() {
+  clearTimeout(ytTimer);
+  if (S.yt) { try { S.yt.destroy(); } catch {} S.yt = null; }
+  $('#yt').innerHTML = '';
+  pic.classList.remove('yt');
+}
+async function playYt(info, seq) {
+  const retune = (ms = 600) => setTimeout(() => seq === tuneSeq && tune(S.cur.dial, { quiet: true }), ms);
+  if (info.scan || !info.videoId) scanQueue(info.ytId, info.list, S.cur?.name);
+  if (!info.videoId) { noSignal('Getting this channel\u2019s video list from YouTube\u2026 (the first time takes a minute or two)'); ytTimer = setTimeout(() => retune(0), 20000); return; }
+  let Y;
+  try { Y = await ytApi(); } catch (e) { if (seq === tuneSeq) noSignal(e.message); return; }
+  if (seq !== tuneSeq) return;
+  pic.classList.add('yt');
+  layout();
+  const box = el('div'); $('#yt').innerHTML = ''; $('#yt').append(box);
+  let started = false;
+  const watchdog = setTimeout(() => { if (!started && seq === tuneSeq) noSignal('No picture from YouTube'); }, 20000);
+  const p = S.yt = new Y.Player(box, {
+    videoId: info.videoId, playerVars: { ...YT_VARS(), start: info.start > 3 ? Math.floor(info.start) : 0 },
+    events: {
+      onReady: e => {
+        if (seq !== tuneSeq) return;
+        e.target.setVolume(Math.round(S.volume * 100));
+        if (S.muted) e.target.mute(); else e.target.unMute();
+        if (info.start > 3) e.target.seekTo(info.start, true);
+        e.target.playVideo();
+      },
+      onStateChange: e => {
+        if (seq !== tuneSeq) return;
+        if (e.data === Y.PlayerState.PLAYING && !started) {
+          started = true; clearTimeout(watchdog); staticOn(false); $('#nosignal').hidden = true;
+          // Back to the schedule when this video's slot ends, even if YouTube's copy runs a bit longer.
+          if (info.endMs) ytTimer = setTimeout(() => retune(0), Math.max(1000, info.endMs - Date.now() + 1500));
+        }
+        if (e.data === Y.PlayerState.ENDED) retune();
+      },
+      onError: () => {
+        if (seq !== tuneSeq) return;
+        post('/api/youtube/bad', { id: info.ytId, videoId: info.videoId }).catch(() => {});
+        toast('That video won\u2019t play here; skipping it', 2500);
+        retune(1200);
+      },
+    },
+  });
+  void p;
+}
+
+// Scanning: reads a playlist's videos (titles and lengths) with a hidden YouTube player, one
+// channel at a time, and sends them to the server, which makes the schedule.
+const SCAN = { queue: [], busy: false, cur: null };
+function scanQueue(ytId, list, name) {
+  if (SCAN.cur?.ytId === ytId || SCAN.queue.some(q => q.ytId === ytId)) return;
+  SCAN.queue.push({ ytId, list, name });
+  if (!SCAN.busy) runScans();
+}
+async function runScans() {
+  SCAN.busy = true;
+  while (SCAN.queue.length) {
+    SCAN.cur = SCAN.queue.shift();
+    try { await scanList(SCAN.cur); }
+    catch (e) { toast(`YouTube: couldn\u2019t read ${SCAN.cur.name || 'the playlist'} (${e.message})`, 6000); }
+  }
+  SCAN.cur = null; SCAN.busy = false;
+  if (S.mode === 'settings') renderSettings();
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function scanList(job) {
+  const Y = await ytApi();
+  const host = el('div'); $('#ytscan').append(host);
+  let err = null, state = -1;
+  const p = await new Promise((resolve, reject) => {
+    const pl = new Y.Player(host, { width: 320, height: 180, playerVars: { ...YT_VARS(), autoplay: 0, mute: 1 },
+      events: { onReady: () => resolve(pl), onError: e => { err = e.data; }, onStateChange: e => { state = e.data; } } });
+    setTimeout(() => reject(new Error('YouTube didn\u2019t answer')), 20000);
+  });
+  try {
+    p.mute();
+    p.cuePlaylist({ list: job.list, listType: 'playlist' });
+    let ids = [];
+    for (let i = 0; i < 60 && !ids.length; i++) { await sleep(250); ids = p.getPlaylist() || []; if (err) break; }
+    if (!ids.length) throw new Error('no videos found (is the playlist public?)');
+    job.total = ids.length; job.done = 0;
+    const out = [];
+    let lastSend = Date.now();
+    for (const id of ids) {
+      err = null; state = -1;
+      p.cueVideoById(id);
+      let dur = 0;
+      for (let i = 0; i < 16 && !dur && err == null; i++) { await sleep(150); dur = p.getDuration() || 0; }
+      if (!dur && err == null) {             // some videos only say how long they are once playing
+        p.playVideo();
+        for (let i = 0; i < 40 && !dur && err == null; i++) { await sleep(200); dur = state === 1 ? p.getDuration() || 0 : 0; }
+        p.pauseVideo();
+      }
+      const title = (p.getVideoData && p.getVideoData()?.title) || '';
+      out.push({ id, title, dur, bad: err != null || !dur });
+      job.done++;
+      if (S.mode === 'settings' && job.done % 5 === 0) renderSettings();
+      // Send what we have every so often, so the channel can start before the scan finishes.
+      if (Date.now() - lastSend > 15000) { lastSend = Date.now(); await post('/api/youtube/videos', { id: job.ytId, videos: out, done: false }).catch(() => {}); }
+    }
+    await post('/api/youtube/videos', { id: job.ytId, videos: out, done: true });
+    await loadState().catch(() => {}); await loadChannels().catch(() => {});
+    if (S.cur?.id === 'yt-' + job.ytId && !S.yt) tune(S.cur.dial, { quiet: true });   // was waiting for this list
+    const ok = out.filter(v => !v.bad).length;
+    toast(`YouTube: ${job.name || 'channel'} is ready, ${ok} videos` + (ok < out.length ? ` (${out.length - ok} can\u2019t play outside YouTube)` : ''), 5000);
+  } finally { try { p.destroy(); } catch {} host.remove(); }
+}
+// Channels that were never scanned, or not for a week, get scanned in the background.
+function scanStale() {
+  for (const c of S.server?.youtube || []) if (!c.scannedAt || Date.now() - c.scannedAt > 7 * 86400e3) scanQueue(c.id, c.list, c.name);
 }
 
 function showGate() {
@@ -197,9 +331,10 @@ setInterval(() => { if (S.mode !== 'settings') sampleBars(); }, 1500);
 function layout() {
   const W = screen.clientWidth, H = screen.clientHeight;
   if (!W || !H) return;
-  const mode = zoomFor(S.cur);
-  const vw = video.videoWidth || 4, vh = video.videoHeight || 3;
-  const box = mode !== 'fit' && T.box ? T.box : { x0: 0, x1: 1, y0: 0, y1: 1 };
+  const isYt = pic.classList.contains('yt');
+  const mode = isYt && zoomFor(S.cur) === 'trim' ? 'fit' : zoomFor(S.cur);
+  const vw = isYt ? 16 : video.videoWidth || 4, vh = isYt ? 9 : video.videoHeight || 3;
+  const box = mode !== 'fit' && T.box && !isYt ? T.box : { x0: 0, x1: 1, y0: 0, y1: 1 };
   const bw = box.x1 - box.x0, bh = box.y1 - box.y0;
   const a = (bw * vw) / (bh * vh);
   let cw, ch;
@@ -241,7 +376,8 @@ function fitWindow() {
   if (!scale || !S.cur) return;
   const [, rh] = res();
   let aspect = 4 / 3;
-  if (S.cur.kind === 'iptv' && video.videoWidth && video.videoHeight) {
+  if (S.cur.kind === 'youtube') aspect = 16 / 9;
+  else if (S.cur.kind === 'iptv' && video.videoWidth && video.videoHeight) {
     const b = zoomFor(S.cur) !== 'fit' && T.box ? T.box : { x0: 0, x1: 1, y0: 0, y1: 1 };
     aspect = (video.videoWidth * (b.x1 - b.x0)) / (video.videoHeight * (b.y1 - b.y0));
   }
@@ -337,6 +473,7 @@ function setVolume(v) {
   S.volume = Math.round(Math.min(1, Math.max(0, v)) * 20) / 20;
   S.muted = false;
   video.volume = S.volume; video.muted = false;
+  try { S.yt?.setVolume(Math.round(S.volume * 100)); S.yt?.unMute(); } catch {}
   showVolume();
   saveSetting({ volume: S.volume });
 }
@@ -348,7 +485,7 @@ function showVolume() {
   box.hidden = false;
   clearTimeout(volT); volT = setTimeout(() => (box.hidden = true), 1500);
 }
-function toggleMute() { S.muted = !S.muted; video.muted = S.muted; showVolume(); }
+function toggleMute() { S.muted = !S.muted; video.muted = S.muted; try { S.muted ? S.yt?.mute() : S.yt?.unMute(); } catch {} showVolume(); }
 
 // ------------------------------------------------------------ guide
 const G = { filter: 'all', row: 0, top: 0, t0: 0, at: 0, onFilters: false, cache: new Map(), fetching: null };
@@ -528,6 +665,7 @@ function browseCats() {
   add('all', 'All channels', () => true);
   add('oompas', 'OOMPAS Box', c => c.kind === 'oompas');
   add('spelunkr', 'Spelunkr', c => c.kind === 'spelunkr');
+  add('youtube', '\u25B6 YouTube', c => c.kind === 'youtube');
   const iptv = ch.filter(c => c.kind === 'iptv');
   if (iptv.length) {
     const lists = [...new Set(iptv.map(c => c.section))];
@@ -703,6 +841,12 @@ function pageRows() {
     R.push({ type: 'choice', label: 'Channel up/down goes through', sub: 'Star channels with a long press on OK (or *)', values: ['all', 'favorites'],
              names: { all: 'All channels', favorites: 'My channels' }, get: () => st.surf || 'all', set: v => { st.surf = v; saveSetting({ surf: v }); } });
     R.push({ type: 'info', label: 'My channels', val: `${(st.favorites || []).length} starred` });
+    sec('YouTube');
+    R.push({ type: 'btn', label: 'Add a YouTube channel\u2026', sub: 'Make a channel from a YouTube playlist or a YouTube channel', val: '+', act: () => { P.data = {}; goPage('ytadd'); } });
+    for (const y of srv.youtube || []) {
+      const scanning = SCAN.cur?.ytId === y.id ? `Reading ${SCAN.cur.done || 0}/${SCAN.cur.total || '?'}` : SCAN.queue.some(q => q.ytId === y.id) ? 'Waiting' : '';
+      R.push({ type: 'btn', label: `${y.dial}  ${y.name}`, sub: y.videos ? `${y.videos} videos \u00B7 ${y.hours} hours, ${y.order === 'inorder' ? 'in order' : 'shuffled'}` : 'Video list not read yet', val: scanning || '\u25B8', act: () => { P.data = {}; goPage('yt', { id: y.id }); } });
+    }
     sec('IPTV');
     R.push({ type: 'toggle', label: 'IPTV channels', sub: srv.iptvChannels ? `${srv.iptvChannels} channels from your playlists` : 'Live channels from M3U playlists', get: () => !!iptvSet().enabled, set: v => setIptv({ enabled: v }, true) });
     R.push({ type: 'btn', label: 'Free channel lists…', sub: 'Public free channels (iptv-org), by category or country', val: `${iptvSet().lists.filter(l => l.builtin).length} on`, act: () => goPage('catalog') });
@@ -820,6 +964,48 @@ function pageRows() {
       P.confirm = null; P.data = {};
       backPage();
       setIptv({ lists: iptvSet().lists.filter(x => x.id !== l.id) }, true);
+    } });
+  } else if (cur.page === 'ytadd') {
+    sec('Add a YouTube channel');
+    P.data.link ??= ''; P.data.name ??= ''; P.data.dial ??= ''; P.data.order ??= 'shuffle';
+    R.push({ type: 'input', label: 'Playlist or channel link', key: 'link', ph: 'youtube.com/playlist?list=\u2026  or  youtube.com/@name' });
+    R.push({ type: 'input', label: 'Name (optional)', key: 'name', ph: 'Saturday Cartoons' });
+    R.push({ type: 'input', label: 'Channel number (optional)', key: 'dial', ph: 'next free from 300' });
+    R.push({ type: 'choice', label: 'Order', sub: 'Shuffled mixes it up each time through', values: ['shuffle', 'inorder'], names: { shuffle: 'Shuffled', inorder: 'In order' }, get: () => P.data.order, set: v => { P.data.order = v; } });
+    R.push({ type: 'info', label: 'How it works', sub: 'The app reads the playlist\u2019s videos (up to 200) and their lengths, then plays them on a schedule like TV. Videos play in YouTube\u2019s own player, ads and all.', val: '' });
+    R.push({ type: 'btn', label: 'Add channel', val: '\u2713', act: async () => {
+      if (!P.data.link.trim()) return toast('Paste a YouTube playlist or channel link first');
+      toast('Adding\u2026', 20000);
+      try {
+        const r = await post('/api/youtube/add', { link: P.data.link, name: P.data.name.trim(), dial: P.data.dial.trim(), order: P.data.order });
+        if (r.error) throw new Error(r.error);
+        P.data = {};
+        await loadState(); await loadChannels();
+        toast(`Channel ${r.channel.dial}: ${r.channel.name}. Reading its videos\u2026`, 5000);
+        scanQueue(r.channel.id, r.channel.list, r.channel.name);
+        backPage();
+      } catch (e) { toast(e.message.replace(/^\{"error":"|"\}$/g, ''), 6000); }
+    } });
+    R.push({ type: 'btn', label: 'Cancel', val: '', act: () => { P.data = {}; backPage(); } });
+  } else if (cur.page === 'yt') {
+    const y = (srv.youtube || []).find(x => x.id === cur.id);
+    if (!y) { setTimeout(backPage); return R; }
+    sec(y.name);
+    R.push({ type: 'info', label: 'Link', sub: y.link, val: y.videos ? `${y.videos} videos` : '' });
+    if (y.bad) R.push({ type: 'info', label: 'Skipped', sub: 'Removed, private, or the uploader doesn\u2019t allow playing outside YouTube', val: `${y.bad} videos` });
+    const ytSave = async patch => { try { const r = await post('/api/youtube/update', { id: y.id, ...patch }); if (r.error) throw new Error(r.error); await loadState(); await loadChannels(); renderSettings(); } catch (e) { toast(e.message.replace(/^\{"error":"|"\}$/g, ''), 5000); } };
+    R.push({ type: 'choice', label: 'Order', values: ['shuffle', 'inorder'], names: { shuffle: 'Shuffled', inorder: 'In order' }, get: () => y.order, set: v => { y.order = v; ytSave({ order: v }); } });
+    P.data.name ??= y.name; P.data.dial ??= String(y.dial);
+    R.push({ type: 'input', label: 'Name', key: 'name', ph: y.name });
+    R.push({ type: 'input', label: 'Channel number', key: 'dial', ph: String(y.dial) });
+    R.push({ type: 'btn', label: 'Save name and number', val: '\u2713', act: () => ytSave({ name: P.data.name, dial: P.data.dial }) });
+    R.push({ type: 'btn', label: 'Read the video list again', sub: 'Picks up new videos (it also does this by itself once a week)', val: SCAN.cur?.ytId === y.id ? `Reading ${SCAN.cur.done || 0}/${SCAN.cur.total || '?'}` : '\u21BB', act: () => { scanQueue(y.id, y.list, y.name); renderSettings(); } });
+    R.push({ type: 'btn', label: P.confirm === y.id ? 'Press OK again to remove' : 'Remove channel', val: '\u2715', act: async () => {
+      if (P.confirm !== y.id) { P.confirm = y.id; return renderSettings(); }
+      P.confirm = null; P.data = {};
+      await post('/api/youtube/remove', { id: y.id }).catch(() => {});
+      await loadState(); await loadChannels();
+      backPage();
     } });
   } else if (cur.page === 'log') {
     sec('Server log');
@@ -1034,6 +1220,7 @@ async function start() {
   const first = S.byDial.get(String(S.settings.lastDial)) || S.channels[0];
   if (first) tune(first.dial);
   else noSignal('No channels yet');
+  setTimeout(scanStale, 5000);
   setInterval(() => loadChannels().then(() => { if (S.mode === 'guide') renderGuide(); }).catch(() => {}), 60000);
   setInterval(() => { if (S.mode === 'guide') $('.g-clock').textContent = hm(Date.now()); }, 15000);
 }
