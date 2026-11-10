@@ -39,6 +39,13 @@ export function parseYouTubeLink(raw) {
   return null;
 }
 
+// Channels that come with the app. Same YouTube channel on two dials, each with its own shuffle.
+export const BUILTIN = [
+  { id: 'hb69', handle: '@HungryBear9562', name: 'HungryBear 69', dial: 69 },
+  { id: 'hb420', handle: '@HungryBear9562', name: 'HungryBear 420', dial: 420 },
+];
+export const BUILTIN_DIALS = new Set(BUILTIN.map(b => b.dial));
+
 export class YouTube {
   constructor({ dataDir, log = () => {}, fetchImpl = fetch }) {
     this.file = path.join(dataDir, 'youtube.json');
@@ -47,6 +54,34 @@ export class YouTube {
     this.channels = [];
     try { this.channels = JSON.parse(fs.readFileSync(this.file, 'utf8')).channels || []; } catch {}
     this.cache = new Map();   // channel id -> { cycle, order, total }
+    this.ensureBuiltins();
+  }
+
+  ensureBuiltins() {
+    for (const b of BUILTIN) {
+      let c = this.channels.find(x => x.id === b.id);
+      if (!c) { c = { id: b.id, list: '', link: `https://www.youtube.com/${b.handle}`, videos: [], bad: [], scannedAt: 0, added: Date.now() }; this.channels.unshift(c); }
+      Object.assign(c, { name: b.name, dial: b.dial, handle: b.handle, order: 'shuffle', builtin: true });
+    }
+    // Anything the user put on a built-in channel's number moves to the next free one from 300.
+    const used = new Set(this.channels.map(c => c.dial));
+    for (const c of this.channels) if (!c.builtin && BUILTIN_DIALS.has(c.dial)) { let d = 300; while (used.has(d)) d++; used.add(d); c.dial = d; }
+    this.save();
+  }
+
+  // Built-in channels are known by their @handle; the uploads list is looked up once on each computer.
+  async resolveBuiltins() {
+    if (this.resolving) return;
+    const c = this.channels.find(x => x.builtin && !x.list);
+    if (!c) return;
+    this.resolving = true;
+    try {
+      const { list } = await this.resolveHandle(c.handle);
+      for (const o of this.channels) if (o.handle === c.handle && !o.list) o.list = list;
+      this.save();
+      this.log(`YouTube: found ${c.handle}`);
+    } catch (e) { this.log(`YouTube: couldn\u2019t look up ${c.handle} yet (${e.message})`); }
+    finally { this.resolving = false; }
   }
 
   save() {
@@ -57,6 +92,8 @@ export class YouTube {
 
   // The channel id for an @handle (or an old /c/ or /user/ link), from the channel's public page.
   async resolveHandle(handle) {
+    const fake = process.env.YT_HANDLES && JSON.parse(process.env.YT_HANDLES)[handle];   // tests
+    if (fake) return { list: fake, name: '' };
     const r = await this.fetch(`https://www.youtube.com/${handle}`, { headers: { 'accept-language': 'en' } });
     if (!r.ok) throw new Error(`YouTube said ${r.status} for ${handle}`);
     const html = await r.text();
@@ -84,6 +121,8 @@ export class YouTube {
   update(id, patch = {}) {
     const c = this.channels.find(x => x.id === id);
     if (!c) throw Object.assign(new Error('No such YouTube channel'), { status: 404 });
+    if (c.builtin) throw Object.assign(new Error('That channel comes with OOMPAS Box'), { status: 400 });
+    if (BUILTIN_DIALS.has(+patch.dial)) throw Object.assign(new Error(`Channel ${patch.dial} is taken`), { status: 400 });
     if (typeof patch.name === 'string' && patch.name.trim()) c.name = patch.name.trim().slice(0, 60);
     if (Number.isFinite(+patch.dial) && +patch.dial >= 1 && +patch.dial <= 9999) c.dial = Math.round(+patch.dial);
     if (['shuffle', 'inorder'].includes(patch.order)) c.order = patch.order;
@@ -91,29 +130,31 @@ export class YouTube {
     return c;
   }
 
-  remove(id) { this.channels = this.channels.filter(c => c.id !== id); this.save(); }
+  remove(id) { this.channels = this.channels.filter(c => c.id !== id || c.builtin); this.save(); }
 
   // From the app's scan: [{ id, title, dur (seconds) }], in playlist order. Videos that won't play
   // in an embedded player come back with bad: true.
   setVideos(id, videos, done = true) {
-    const c = this.channels.find(x => x.id === id);
-    if (!c) throw Object.assign(new Error('No such YouTube channel'), { status: 404 });
+    const first = this.channels.find(x => x.id === id);
+    if (!first) throw Object.assign(new Error('No such YouTube channel'), { status: 404 });
     const clean = (Array.isArray(videos) ? videos : []).slice(0, 5000)
       .filter(v => v && /^[\w-]{11}$/.test(v.id))
       .map(v => ({ id: v.id, title: String(v.title || '').slice(0, 200), dur: Math.max(0, Math.round(+v.dur || 0)), bad: !!v.bad }));
-    c.videos = clean.filter(v => !v.bad);
-    c.bad = [...new Set([...(c.bad || []).filter(b => !clean.some(v => v.id === b)), ...clean.filter(v => v.bad).map(v => v.id)])];
-    if (done) c.scannedAt = Date.now();
+    for (const c of this.channels.filter(x => x.id === id || (first.list && x.list === first.list))) {
+      c.videos = clean.filter(v => !v.bad);
+      c.bad = [...new Set([...(c.bad || []).filter(b => !clean.some(v => v.id === b)), ...clean.filter(v => v.bad).map(v => v.id)])];
+      if (done) c.scannedAt = Date.now();
+    }
     this.save();
-    this.log(`YouTube: ${c.name}: ${this.playable(c).length} videos ready${c.bad.length ? `, ${c.bad.length} can’t play outside YouTube` : ''}`);
-    return c;
+    if (done) this.log(`YouTube: ${first.name}: ${this.playable(first).length} videos ready${first.bad.length ? `, ${first.bad.length} can’t play outside YouTube` : ''}`);
+    return first;
   }
 
   // A video that turned out not to play (removed, private, embedding off): skip it from now on.
   markBad(id, videoId) {
     const c = this.channels.find(x => x.id === id);
     if (!c || !/^[\w-]{11}$/.test(videoId) || c.bad.includes(videoId)) return;
-    c.bad.push(videoId);
+    for (const o of this.channels) if ((o === c || (c.list && o.list === c.list)) && !o.bad.includes(videoId)) o.bad.push(videoId);
     this.save();
   }
 
@@ -165,7 +206,7 @@ export class YouTube {
     }
     if (!out.length) {
       for (let h = Math.floor(from / 3600e3) * 3600e3; h < until; h += 3600e3)
-        out.push({ key: `${ch.id}@${h}`, title: c.videos.length ? ch.name : `${ch.name} · getting the video list…`, year: '', startMs: h, endMs: h + 3600e3, live: true });
+        out.push({ key: `${ch.id}@${h}`, title: c.videos.length ? ch.name : `${c.handle || ch.name} · getting the video list…`, year: '', startMs: h, endMs: h + 3600e3, live: true });
     }
     return out;
   }
@@ -174,6 +215,7 @@ export class YouTube {
   playAt(ch, t) {
     const c = this.find(ch.ytId || ch.id);
     if (!c) return null;
+    if (!c.list) { this.resolveBuiltins(); return { ytId: c.id, list: '', finding: c.handle || c.name }; }
     const p = this.programs(ch, t, t + 1)[0];
     if (!p || !p.videoId) return { ytId: c.id, list: c.list, scan: !c.scannedAt || Date.now() - c.scannedAt > 7 * 86400e3 };
     return { ytId: c.id, list: c.list, videoId: p.videoId, start: Math.max(0, (t - p.startMs) / 1000), endMs: p.endMs,
@@ -181,7 +223,7 @@ export class YouTube {
   }
 
   status() {
-    return this.channels.map(c => ({ id: c.id, name: c.name, dial: c.dial, link: c.link, list: c.list, order: c.order,
+    return this.channels.slice().sort((a, b) => a.dial - b.dial).map(c => ({ id: c.id, name: c.name, dial: c.dial, link: c.link, list: c.list, order: c.order, builtin: !!c.builtin,
       videos: this.playable(c).length, bad: c.bad.length, hours: Math.round(this.playable(c).reduce((s, v) => s + v.dur, 0) / 360) / 10,
       scannedAt: c.scannedAt }));
   }

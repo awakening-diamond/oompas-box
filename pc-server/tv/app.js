@@ -172,6 +172,7 @@ function stopYt() {
 }
 async function playYt(info, seq) {
   const retune = (ms = 600) => setTimeout(() => seq === tuneSeq && tune(S.cur.dial, { quiet: true }), ms);
+  if (info.finding) { noSignal(`Finding ${info.finding} on YouTube\u2026`); ytTimer = setTimeout(() => retune(0), 15000); return; }
   if (info.scan || !info.videoId) scanQueue(info.ytId, info.list, S.cur?.name);
   if (!info.videoId) { noSignal('Getting this channel\u2019s video list from YouTube\u2026 (the first time takes a minute or two)'); ytTimer = setTimeout(() => retune(0), 20000); return; }
   let Y;
@@ -216,7 +217,7 @@ async function playYt(info, seq) {
 // channel at a time, and sends them to the server, which makes the schedule.
 const SCAN = { queue: [], busy: false, cur: null };
 function scanQueue(ytId, list, name) {
-  if (SCAN.cur?.ytId === ytId || SCAN.queue.some(q => q.ytId === ytId)) return;
+  if (!list || SCAN.cur?.list === list || SCAN.queue.some(q => q.list === list)) return;
   SCAN.queue.push({ ytId, list, name });
   if (!SCAN.busy) runScans();
 }
@@ -268,14 +269,15 @@ async function scanList(job) {
     }
     await post('/api/youtube/videos', { id: job.ytId, videos: out, done: true });
     await loadState().catch(() => {}); await loadChannels().catch(() => {});
-    if (S.cur?.id === 'yt-' + job.ytId && !S.yt) tune(S.cur.dial, { quiet: true });   // was waiting for this list
+    const same = new Set((S.server?.youtube || []).filter(y => y.list === job.list).map(y => 'yt-' + y.id));
+    if (same.has(S.cur?.id) && !S.yt) tune(S.cur.dial, { quiet: true });   // was waiting for this list
     const ok = out.filter(v => !v.bad).length;
     toast(`YouTube: ${job.name || 'channel'} is ready, ${ok} videos` + (ok < out.length ? ` (${out.length - ok} can\u2019t play outside YouTube)` : ''), 5000);
   } finally { try { p.destroy(); } catch {} host.remove(); }
 }
 // Channels that were never scanned, or not for a week, get scanned in the background.
 function scanStale() {
-  for (const c of S.server?.youtube || []) if (!c.scannedAt || Date.now() - c.scannedAt > 7 * 86400e3) scanQueue(c.id, c.list, c.name);
+  for (const c of S.server?.youtube || []) if (c.list && (!c.scannedAt || Date.now() - c.scannedAt > 7 * 86400e3)) scanQueue(c.id, c.list, c.name);
 }
 
 function showGate() {
@@ -844,7 +846,7 @@ function pageRows() {
     sec('YouTube');
     R.push({ type: 'btn', label: 'Add a YouTube channel\u2026', sub: 'Make a channel from a YouTube playlist or a YouTube channel', val: '+', act: () => { P.data = {}; goPage('ytadd'); } });
     for (const y of srv.youtube || []) {
-      const scanning = SCAN.cur?.ytId === y.id ? `Reading ${SCAN.cur.done || 0}/${SCAN.cur.total || '?'}` : SCAN.queue.some(q => q.ytId === y.id) ? 'Waiting' : '';
+      const scanning = SCAN.cur?.list === y.list && y.list ? `Reading ${SCAN.cur.done || 0}/${SCAN.cur.total || '?'}` : SCAN.queue.some(q => q.list === y.list) ? 'Waiting' : '';
       R.push({ type: 'btn', label: `${y.dial}  ${y.name}`, sub: y.videos ? `${y.videos} videos \u00B7 ${y.hours} hours, ${y.order === 'inorder' ? 'in order' : 'shuffled'}` : 'Video list not read yet', val: scanning || '\u25B8', act: () => { P.data = {}; goPage('yt', { id: y.id }); } });
     }
     sec('IPTV');
@@ -992,15 +994,18 @@ function pageRows() {
     if (!y) { setTimeout(backPage); return R; }
     sec(y.name);
     R.push({ type: 'info', label: 'Link', sub: y.link, val: y.videos ? `${y.videos} videos` : '' });
+    if (y.builtin) R.push({ type: 'info', label: 'Comes with OOMPAS Box', sub: `Always on channel ${y.dial}, shuffled on its own schedule`, val: '' });
     if (y.bad) R.push({ type: 'info', label: 'Skipped', sub: 'Removed, private, or the uploader doesn\u2019t allow playing outside YouTube', val: `${y.bad} videos` });
+    if (!y.builtin) {
     const ytSave = async patch => { try { const r = await post('/api/youtube/update', { id: y.id, ...patch }); if (r.error) throw new Error(r.error); await loadState(); await loadChannels(); renderSettings(); } catch (e) { toast(e.message.replace(/^\{"error":"|"\}$/g, ''), 5000); } };
     R.push({ type: 'choice', label: 'Order', values: ['shuffle', 'inorder'], names: { shuffle: 'Shuffled', inorder: 'In order' }, get: () => y.order, set: v => { y.order = v; ytSave({ order: v }); } });
     P.data.name ??= y.name; P.data.dial ??= String(y.dial);
     R.push({ type: 'input', label: 'Name', key: 'name', ph: y.name });
     R.push({ type: 'input', label: 'Channel number', key: 'dial', ph: String(y.dial) });
     R.push({ type: 'btn', label: 'Save name and number', val: '\u2713', act: () => ytSave({ name: P.data.name, dial: P.data.dial }) });
-    R.push({ type: 'btn', label: 'Read the video list again', sub: 'Picks up new videos (it also does this by itself once a week)', val: SCAN.cur?.ytId === y.id ? `Reading ${SCAN.cur.done || 0}/${SCAN.cur.total || '?'}` : '\u21BB', act: () => { scanQueue(y.id, y.list, y.name); renderSettings(); } });
-    R.push({ type: 'btn', label: P.confirm === y.id ? 'Press OK again to remove' : 'Remove channel', val: '\u2715', act: async () => {
+    }
+    R.push({ type: 'btn', label: 'Read the video list again', sub: 'Picks up new videos (it also does this by itself once a week)', val: SCAN.cur?.list === y.list && y.list ? `Reading ${SCAN.cur.done || 0}/${SCAN.cur.total || '?'}` : '\u21BB', act: () => { scanQueue(y.id, y.list, y.name); renderSettings(); } });
+    if (!y.builtin) R.push({ type: 'btn', label: P.confirm === y.id ? 'Press OK again to remove' : 'Remove channel', val: '\u2715', act: async () => {
       if (P.confirm !== y.id) { P.confirm = y.id; return renderSettings(); }
       P.confirm = null; P.data = {};
       await post('/api/youtube/remove', { id: y.id }).catch(() => {});

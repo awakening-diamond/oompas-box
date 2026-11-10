@@ -1,7 +1,7 @@
 {
   "name": "oompas-box",
   "productName": "OOMPAS Box",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "OOMPAS Box: retro TV channels from the Internet Archive, plus your IPTV, on your computer and your MiSTer",
   "main": "main.js",
   "author": "OOMPAS Box",

@@ -1,3 +1,7 @@
+## OOMPAS Box 1.2.1
+
+- New: **channels 69 and 420**, built in: HungryBear9562's videos, shuffled, each channel on its own schedule.
+
 ## OOMPAS Box 1.2.0
 
 - New: **YouTube channels.** Make a channel from any YouTube playlist or YouTube channel; it plays on a schedule like TV, with
