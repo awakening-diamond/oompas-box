@@ -1573,7 +1573,7 @@ async function streamChannel(bc, dial, req, res, size, opts = {}) {
 const APP_DATA = process.env.APP_DATA || CFG.cacheDir;
 const SETTINGS_FILE = path.join(APP_DATA, 'settings.json');
 const SETTINGS = {
-  widescreen: CFG.widescreen, bars: CFG.bars, crt: true, banner: true, volume: 0.8, lastDial: null,
+  widescreen: CFG.widescreen, bars: CFG.bars, crt: true, banner: true, captions: false, volume: 0.8, lastDial: null,
   iptv: { enabled: false, dialStart: 500, hideAdult: true, hideBroken: false, freeGuides: true, countries: [], languages: [], categories: [], lists: [] },
   oompas: 'off',        // OOMPAS Box's own channels: off, guide (Guide & Weather only) or all
   favorites: [],        // starred channel ids: "My channels"
@@ -1604,7 +1604,7 @@ function applySettings(bc) {
 function mergeSettings(patch) {
   const p = patch || {};
   if (['fit', 'zoom', 'fill'].includes(p.widescreen)) SETTINGS.widescreen = p.widescreen;
-  for (const k of ['bars', 'crt', 'banner']) if (typeof p[k] === 'boolean') SETTINGS[k] = p[k];
+  for (const k of ['bars', 'crt', 'banner', 'captions']) if (typeof p[k] === 'boolean') SETTINGS[k] = p[k];
   if (typeof p.volume === 'number') SETTINGS.volume = Math.min(1, Math.max(0, p.volume));
   if (p.lastDial != null) SETTINGS.lastDial = String(p.lastDial).slice(0, 8);
   if (Array.isArray(p.favorites)) SETTINGS.favorites = [...new Set(p.favorites.map(x => String(x).slice(0, 80)))].slice(0, 2000);

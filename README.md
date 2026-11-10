@@ -26,6 +26,7 @@ FFmpeg is built in, so nothing else needs installing.
 | C | Channel list: browse by category (Classic, Movies, News…), by country, or ★ My channels |
 | Hold OK (or \*) | Star the channel (adds it to ★ My channels) |
 | Z | Picture shape for this channel: Fit · Trim bars · Fill window · Stretch |
+| T | Captions (CC) on/off: YouTube and IPTV channels that have them (also the CC button when you move the mouse) |
 | ← → or + − | Volume · **M** mute |
 | Back / Esc / Backspace | Back to the last channel (or close a menu) |
 | S | Settings · **F** or F11 full screen |

@@ -1,3 +1,9 @@
+## OOMPAS Box 1.3.1 (engine update)
+
+- New: **captions (CC).** Press **T**, click the **CC** button (move the mouse to show it), or Settings → Picture → Captions.
+  Works on YouTube channels (English captions when the video has them) and IPTV channels whose streams carry subtitles or TV
+  closed captions. The old-tape channels don't have captions to show.
+
 ## OOMPAS Box 1.3.0
 
 - **Updates without reinstalling.** The engine (channels, guide, YouTube, IPTV, the TV screens) now updates itself from GitHub

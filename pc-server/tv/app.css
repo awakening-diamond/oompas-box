@@ -84,6 +84,9 @@ button { font: inherit; }
 #mousebar { position: absolute; top: 1rem; right: 1rem; z-index: 8; display: flex; gap: .4rem; }
 #mousebar button { background: rgba(14,61,71,.9); color: var(--ink); border: 2px solid var(--edge); padding: .3rem .7rem; font-size: .75rem; cursor: pointer; }
 #mousebar button:hover { background: var(--blue2); }
+#mousebar button.on { background: var(--gold, #f0c040); color: #102a30; border-color: var(--gold, #f0c040); }
+/* Captions from the stream (IPTV), drawn by the browser. */
+#video::cue { font-family: system-ui, sans-serif; font-size: 1.05em; color: #fff; background: rgba(0, 0, 0, .78); }
 
 /* ---------- panels (guide, settings) ---------- */
 .panel { position: absolute; z-index: 10; width: min(100vw, calc(100vh * 4 / 3)); height: min(100vh, calc(100vw * 3 / 4));

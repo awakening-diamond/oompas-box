@@ -134,9 +134,11 @@ function play(info, seq, isFallback) {
         h.autoLevelCapping = cap;
         if (r === 'low') h.currentLevel = cap;
       });
+      h.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => applyCaptions());
       h.loadSource(abs(info.url));
       h.attachMedia(video);
-      S.player = { destroy: () => h.destroy() };
+      S.hls = h;
+      S.player = { destroy: () => { S.hls = null; h.destroy(); } };
       go();
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = abs(info.url); video.onerror = () => fail('Can’t play this stream'); go();
@@ -144,6 +146,47 @@ function play(info, seq, isFallback) {
   } else {
     video.src = abs(info.url); video.onerror = () => fail('Can’t play this stream'); go();
   }
+}
+
+// ------------------------------------------------------------ captions (CC)
+// YouTube: the player's own captions (English when there are some). IPTV: subtitle tracks in the
+// stream and TV closed captions (CEA-608), which hls.js reads. Our own channels (old tapes) don't carry any.
+const ccOn = () => !!S.settings?.captions;
+const isEn = t => /^en/i.test(t.lang || t.language || '') || /english/i.test(t.name || t.label || '');
+function captionCount() {
+  if (S.yt) return -1;   // YouTube decides per video
+  return (S.hls?.subtitleTracks?.length || 0) + [...video.textTracks].filter(t => t.kind === 'captions' || t.kind === 'subtitles').length;
+}
+function applyCaptions() {
+  const on = ccOn();
+  $('#ccbtn')?.classList.toggle('on', on);
+  if (S.yt) {
+    try {
+      if (on) { S.yt.loadModule('captions'); S.yt.setOption('captions', 'track', { languageCode: 'en' }); }
+      else S.yt.unloadModule('captions');
+    } catch {}
+    return;
+  }
+  const h = S.hls;
+  if (h) {
+    h.subtitleDisplay = on;
+    const tr = h.subtitleTracks || [];
+    const pick = tr.findIndex(isEn);
+    h.subtitleTrack = on && tr.length ? (pick >= 0 ? pick : 0) : -1;
+  }
+  // Embedded closed captions show up as text tracks; show one (English first), hide the rest.
+  const tts = [...video.textTracks].filter(t => t.kind === 'captions' || t.kind === 'subtitles');
+  const want = on ? (tts.find(t => isEn(t) && t.kind === 'captions') || tts.find(isEn) || tts[0]) : null;
+  if (!h || !h.subtitleTracks?.length) for (const t of tts) t.mode = t === want ? 'showing' : 'disabled';
+}
+video.textTracks.addEventListener('addtrack', () => applyCaptions());
+function toggleCaptions() {
+  const on = !ccOn();
+  S.settings = { ...(S.settings || {}), captions: on };
+  saveSetting({ captions: on });
+  applyCaptions();
+  const n = captionCount();
+  toast(on ? (n === 0 ? 'Captions on (none on this channel)' : 'Captions on') : 'Captions off', 2200);
 }
 
 // ------------------------------------------------------------ YouTube channels
@@ -162,7 +205,7 @@ function ytApi() {
   });
   return ytApiP;
 }
-const YT_VARS = () => ({ autoplay: 1, controls: 0, disablekb: 1, fs: 0, rel: 0, iv_load_policy: 3, playsinline: 1, cc_load_policy: 0, origin: location.origin });
+const YT_VARS = () => ({ autoplay: 1, controls: 0, disablekb: 1, fs: 0, rel: 0, iv_load_policy: 3, playsinline: 1, cc_load_policy: ccOn() ? 1 : 0, cc_lang_pref: 'en', origin: location.origin });
 let ytTimer = 0;
 function stopYt() {
   clearTimeout(ytTimer);
@@ -191,6 +234,7 @@ async function playYt(info, seq) {
         e.target.setVolume(Math.round(S.volume * 100));
         if (S.muted) e.target.mute(); else e.target.unMute();
         if (info.start > 3) e.target.seekTo(info.start, true);
+        if (ccOn()) applyCaptions();
         e.target.playVideo();
       },
       onStateChange: e => {
@@ -841,6 +885,7 @@ function pageRows() {
                names: { free: 'Keep my size', 1: 'Follow picture \u00D71', 2: 'Follow picture \u00D72', 3: 'Follow picture \u00D73', ...Object.fromEntries(FIXED.map(f => [f, f.replace('x', '\u00D7')])) }, get: () => String(st.windowScale || 'free'),
                set: v => { st.windowScale = v; saveSetting({ windowScale: v }); applyWindowSize(); } });
     R.push({ type: 'toggle', label: 'Trim black bars', sub: 'Removes bars baked into old videos', get: () => st.bars !== false, set: v => { st.bars = v; saveSetting({ bars: v }); } });
+    R.push({ type: 'toggle', label: 'Captions (CC)', sub: 'On YouTube and IPTV channels that have them. T toggles them', get: () => ccOn(), set: v => { if (v !== ccOn()) toggleCaptions(); } });
     R.push({ type: 'toggle', label: 'CRT look', sub: 'Scanlines and a softer picture in this app', get: () => st.crt !== false, set: v => { st.crt = v; screen.classList.toggle('crt', v); saveSetting({ crt: v }); } });
     R.push({ type: 'toggle', label: 'Channel banner', sub: 'Show what’s on when you change channel', get: () => st.banner !== false, set: v => { st.banner = v; saveSetting({ banner: v }); } });
     sec('Channels');
@@ -1134,7 +1179,7 @@ const KEYMAP = {
   PageUp: 'pageup', PageDown: 'pagedown', ChannelUp: 'chup', ChannelDown: 'chdown',
   g: 'guide', G: 'guide', Guide: 'guide', F1: 'guide', s: 'settings', S: 'settings', ContextMenu: 'settings', Settings: 'settings',
   i: 'info', I: 'info', Info: 'info', m: 'mute', M: 'mute', AudioVolumeMute: 'mute',
-  z: 'zoom', Z: 'zoom', ColorF1Green: 'zoom', c: 'browse', C: 'browse', l: 'browse', L: 'browse', '*': 'star', y: 'star', Y: 'star', ColorF2Yellow: 'star', ColorF0Red: 'browse',
+  t: 'captions', T: 'captions', Subtitle: 'captions', ClosedCaption: 'captions', z: 'zoom', Z: 'zoom', ColorF1Green: 'zoom', c: 'browse', C: 'browse', l: 'browse', L: 'browse', '*': 'star', y: 'star', Y: 'star', ColorF2Yellow: 'star', ColorF0Red: 'browse',
   f: 'fullscreen', F: 'fullscreen', F11: 'fullscreen', '+': 'volup', '=': 'volup', '-': 'voldown', _: 'voldown',
 };
 // Holding OK stars a channel (TV remotes have no * key). A short press is a normal OK.
@@ -1194,6 +1239,7 @@ function dispatchKey(k) {
     case 'settings': return openSettings();
     case 'browse': return openBrowse();
     case 'zoom': return cycleZoom();
+    case 'captions': return toggleCaptions();
     case 'star': return toggleFav(S.cur);
     case 'mute': return toggleMute();
   }
@@ -1208,7 +1254,7 @@ addEventListener('mousemove', () => {
 $('#mousebar').addEventListener('click', e => {
   const a = e.target.closest('button')?.dataset.act;
   if (a === 'up') step(1); if (a === 'down') step(-1);
-  if (a === 'guide') openGuide(); if (a === 'settings') openSettings(); if (a === 'browse') openBrowse(); if (a === 'fullscreen') toggleFullscreen(); if (a === 'zoom') cycleZoom();
+  if (a === 'guide') openGuide(); if (a === 'settings') openSettings(); if (a === 'browse') openBrowse(); if (a === 'fullscreen') toggleFullscreen(); if (a === 'zoom') cycleZoom(); if (a === 'captions') toggleCaptions();
 });
 screen.addEventListener('click', () => { if (S.mode === 'tv') showBanner(S.cur, 6000); });
 screen.addEventListener('dblclick', toggleFullscreen);
@@ -1234,6 +1280,7 @@ async function start() {
   if (first) tune(first.dial);
   else noSignal('No channels yet');
   setTimeout(scanStale, 5000);
+  applyCaptions();
   setInterval(() => loadChannels().then(() => { if (S.mode === 'guide') renderGuide(); }).catch(() => {}), 60000);
   setInterval(() => { if (S.mode === 'guide') $('.g-clock').textContent = hm(Date.now()); }, 15000);
 }
