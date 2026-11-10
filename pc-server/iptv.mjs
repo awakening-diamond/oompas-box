@@ -31,6 +31,34 @@ export const CATALOG = [
 ];
 
 // Networks that iptv-org lists as English but that broadcast in another language.
+// Free daily TV guides (XMLTV) for the free streaming services most free channels come from.
+// Matched to channels by the service's channel id in the stream link, else by channel name.
+const MJH = 'https://raw.githubusercontent.com/matthuisman/i.mjh.nz/master';
+export const FREE_GUIDES = [
+  { id: 'pluto', name: 'Pluto TV', url: `${MJH}/PlutoTV/us.xml.gz`, idFrom: u => (u.match(/(?:jmp2\.uk\/plu-|pluto\.tv\/.*?)([0-9a-f]{24})/i) || [])[1] },
+  { id: 'samsung', name: 'Samsung TV Plus', url: `${MJH}/SamsungTVPlus/us.xml.gz`, idFrom: u => (u.match(/jmp2\.uk\/sam-([A-Z0-9]+)/) || [])[1] },
+  { id: 'plex', name: 'Plex', url: `${MJH}/Plex/us.xml.gz`, idFrom: u => (u.match(/plex\.tv\/.*?([0-9a-f]{24})/i) || [])[1], suffix: true },
+  { id: 'roku', name: 'The Roku Channel', url: `${MJH}/Roku/all.xml.gz` },
+];
+const GUIDE_URLS = process.env.IPTV_GUIDES ? JSON.parse(process.env.IPTV_GUIDES) : null;   // tests: { id: url }
+// "Pluto TV Jewelry Television (US)" and "Jewelry TV" -> "jewelry"
+const normName = s => String(s || '').toLowerCase().replace(/\s*[\(\[][^\)\]]*[\)\]]/g, '').replace(/&/g, ' and ')
+  .replace(/\btelevision\b/g, 'tv').replace(/^(pluto tv|the)\s+/, '').replace(/[^a-z0-9]/g, '').replace(/(tv|channel|network)$/, '');
+// Own copy of a piece of a big string (V8 keeps the whole guide file alive behind substrings).
+const own = s => Buffer.from(String(s), 'utf8').toString('utf8');
+export function xmltvChannels(xml) {
+  const ids = new Set(), names = new Map();
+  for (const m of xml.matchAll(/<channel\s+id="([^"]+)"[^>]*>([\s\S]*?)<\/channel>/g)) {
+    const id = own(m[1]);
+    ids.add(id);
+    for (const d of m[2].matchAll(/<display-name[^>]*>([\s\S]*?)<\/display-name>/g)) {
+      const k = own(normName(d[1].replace(/&amp;/g, '&').replace(/&apos;/g, "'")));
+      if (k && !names.has(k)) names.set(k, id);
+    }
+  }
+  return { ids, names };
+}
+
 const NOT_ENGLISH = /telemundo|univision|unimas|\blatino\b|latinx|espa[nñ]ol|deportes|telenovela|azteca|estrella tv|mega tv|extrema|\bcine\b|tbn (ukraine|armenia)|omid|payvand|mtv flow|vevo latino/i;
 const ADULT = /\b(xxx|adult|porn|erotic|playboy|hustler|brazzers|18\+|hentai|sexy)\b/i;
 const RAINBOW = ['#ff5a5a', '#ffa64d', '#ffd84a', '#5ad27a', '#4fb0ff', '#a07bff', '#ff7bd0'];
@@ -80,7 +108,7 @@ export function parseXMLTV(xml, wanted, from, until) {
   const out = new Map();
   const names = new Map();   // display-name -> id, to match playlists without tvg-id
   for (const m of xml.matchAll(/<channel\s+id="([^"]+)"[^>]*>([\s\S]*?)<\/channel>/g)) {
-    for (const d of m[2].matchAll(/<display-name[^>]*>([\s\S]*?)<\/display-name>/g)) names.set(unesc(d[1]).trim().toLowerCase(), unesc(m[1]));
+    for (const d of m[2].matchAll(/<display-name[^>]*>([\s\S]*?)<\/display-name>/g)) names.set(own(unesc(d[1]).trim().toLowerCase()), own(unesc(m[1])));
   }
   const re = /<programme\b([^>]*)>([\s\S]*?)<\/programme>/g;
   let m;
@@ -94,8 +122,8 @@ export function parseXMLTV(xml, wanted, from, until) {
     const title = unesc((m[2].match(/<title[^>]*>([\s\S]*?)<\/title>/) || [])[1] || '').trim();
     const sub = unesc((m[2].match(/<sub-title[^>]*>([\s\S]*?)<\/sub-title>/) || [])[1] || '').trim();
     const desc = unesc((m[2].match(/<desc[^>]*>([\s\S]*?)<\/desc>/) || [])[1] || '').trim();
-    if (!out.has(ch)) out.set(ch, []);
-    out.get(ch).push({ title: title || 'On air', sub, desc: desc.slice(0, 400), startMs: start, endMs: stop });
+    if (!out.has(ch)) out.set(own(ch), []);
+    out.get(ch).push({ title: own(title || 'On air'), sub: own(sub), desc: own(desc.slice(0, 400)), startMs: start, endMs: stop });
   }
   for (const list of out.values()) list.sort((x, y) => x.startMs - y.startMs);
   return { programmes: out, names };
@@ -117,6 +145,10 @@ export class Iptv {
     this.countries = {};        // country code -> channels, across the lists that are on
     this.lists = new Map();     // list id -> { channels, epgUrl, at, error }
     this.epg = new Map();       // epg url -> { programmes, names, at }
+    this.guides = new Map();    // free guide id -> { ids, names, programmes, loaded:Set, at, file }
+    this.guideFor = new Map();  // channel id -> { g, key }
+    this.guideCount = 0;
+    this.guideTimer = null;
     this.channels = [];
     this.busy = null;
   }
@@ -182,8 +214,96 @@ export class Iptv {
           this.log(`IPTV guide failed (${e.message})`);
         }
       }
+      if (this.settings.freeGuides !== false) await this.loadFreeGuides(force);
     })().finally(() => { this.busy = null; });
     return this.busy;
+  }
+
+  // Downloads each free guide (at most once every 12 hours; kept on disk), notes its channels,
+  // then matches and loads the schedules the current channels need.
+  async loadFreeGuides(force = false) {
+    const dir = path.join(this.dir, 'guides');
+    fs.mkdirSync(dir, { recursive: true });
+    for (const g of FREE_GUIDES) {
+      const url = GUIDE_URLS ? GUIDE_URLS[g.id] : g.url;
+      if (!url) continue;
+      const file = path.join(dir, g.id + '.xml.gz');
+      const have = this.guides.get(g.id);
+      const age = fs.existsSync(file) ? Date.now() - fs.statSync(file).mtimeMs : Infinity;
+      if (!force && have && age < 12 * 3600e3 && Date.now() - have.at < 6 * 3600e3) continue;
+      try {
+        if (force || age >= 12 * 3600e3) {
+          try { fs.writeFileSync(file, await this.get(url, true)); }
+          catch (e) { if (age === Infinity) throw e; this.log(`IPTV: ${g.name} guide: ${e.message}, using the saved copy`); }
+        }
+        const xml = this.readGuide(file);
+        const { ids, names } = xmltvChannels(xml);
+        const suffix = g.suffix ? new Map([...ids].map(id => [id.split('-').pop(), id])) : null;
+        this.guides.set(g.id, { ids, names, suffix, programmes: new Map(), loaded: new Set(), at: Date.now(), file });
+      } catch (e) {
+        this.log(`IPTV: couldn't get the ${g.name} guide (${e.message})`);
+      }
+    }
+    this.matchGuides();
+    this.loadGuideSchedules();
+    this.log(`IPTV: schedules for ${this.guideCount} of ${this.channels.length} channels`);
+  }
+
+  readGuide(file) {
+    let buf = fs.readFileSync(file);
+    if (buf[0] === 0x1f && buf[1] === 0x8b) buf = zlib.gunzipSync(buf);
+    return buf.toString('utf8');
+  }
+
+  // Which free guide channel each IPTV channel is: its own playlist guide wins, then the
+  // service id in the stream link, then the name.
+  matchGuides() {
+    this.guideFor = new Map();
+    let n = 0;
+    for (const c of this.channels) {
+      const own = c.epgUrl && this.epg.get(c.epgUrl);
+      if (own && (own.programmes.has(c.tvgId) || own.names.get(String(c.tvgName || c.name).toLowerCase()) || own.names.get(String(c.name).toLowerCase()))) { n++; continue; }
+      if (this.settings.freeGuides === false) continue;
+      let hit = null;
+      const u = c.iptv?.url || '';
+      for (const g of FREE_GUIDES) {
+        const d = this.guides.get(g.id);
+        const sid = d && g.idFrom?.(u);
+        const key = sid && (d.suffix ? d.suffix.get(sid) : d.ids.has(sid) && sid);
+        if (key) { hit = { g: g.id, key }; break; }
+      }
+      if (!hit) {
+        const tries = [c.guideName, c.name, c.tvgName].map(normName).filter(Boolean);
+        outer: for (const k of tries) for (const g of FREE_GUIDES) {
+          const key = this.guides.get(g.id)?.names.get(k);
+          if (key) { hit = { g: g.id, key }; break outer; }
+        }
+      }
+      if (hit) { this.guideFor.set(c.id, hit); n++; }
+    }
+    this.guideCount = n;
+  }
+
+  // Reads the schedules of the matched channels (3 hours back to 30 ahead) from the saved guides.
+  loadGuideSchedules() {
+    const from = Date.now() - 3 * 3600e3, until = Date.now() + 30 * 3600e3;
+    for (const [id, d] of this.guides) {
+      const want = new Set([...this.guideFor.values()].filter(h => h.g === id).map(h => h.key));
+      const stale = Date.now() - (d.parsedAt || 0) > 6 * 3600e3;
+      if (!want.size || (!stale && [...want].every(k => d.loaded.has(k)))) continue;
+      try {
+        d.programmes = parseXMLTV(this.readGuide(d.file), want, from, until).programmes;
+        d.loaded = want; d.parsedAt = Date.now();
+      } catch (e) { this.log(`IPTV: guide ${id}: ${e.message}`); }
+    }
+  }
+
+  // After the channel list changes: match again, and read any newly needed schedules a bit later.
+  rematch() {
+    if (!this.guides.size) return;
+    this.matchGuides();
+    clearTimeout(this.guideTimer);
+    this.guideTimer = setTimeout(() => this.loadGuideSchedules(), 1500);
   }
 
   // A hand-picked lineup: fixed channel numbers, stream links looked up fresh in its source list
@@ -204,7 +324,7 @@ export class Iptv {
       const cands = src.filter(x => x.tvgId === c.id && officialHost(x.url));
       const hit = cands.find(x => x.name.startsWith(c.match)) || cands[0];
       return { name: c.name, tvgId: c.id, tvgName: hit?.tvgName || c.match, logo: hit?.logo || c.logo, group: c.group,
-               url: hit?.url || c.url, ua: hit?.ua || '', referrer: hit?.referrer || '', chno: c.dial, curated: true };
+               url: hit?.url || c.url, ua: hit?.ua || '', referrer: hit?.referrer || '', chno: c.dial, curated: true, guideName: c.guide || '' };
     });
     this.lists.set(l.id, { url: l.url, channels, epgUrl: l.epg || '', at: Date.now(), error: null, curated: true });
     this.log(`IPTV: ${def.name}: ${channels.length} channels`);
@@ -324,7 +444,7 @@ export class Iptv {
             out.push({ dial: d, id: 'iptv-' + sha(l.id + '|' + c.tvgId), name: c.name, tags: [], call: callOf(c.name), color: RAINBOW[d % RAINBOW.length],
                        langs: ['English'], health: health ? (health.ok ? 'ok' : 'bad') : '', healthWhy: health?.why || '',
                        kind: 'iptv', logo: c.logo, group: c.group, list: data.curated ? (l.name.replace(/\s*\(.*\)$/, '')) : l.name, listId: l.id, country: 'us',
-                       cats: [c.group], epgUrl: data.epgUrl, tvgId: c.tvgId, tvgName: c.tvgName, iptv: { url: c.url, ua: c.ua, referrer: c.referrer } });
+                       cats: [c.group], epgUrl: data.epgUrl, tvgId: c.tvgId, tvgName: c.tvgName, guideName: c.guideName, iptv: { url: c.url, ua: c.ua, referrer: c.referrer } });
             continue;
           }
           const country = countryOf(c);
@@ -363,6 +483,7 @@ export class Iptv {
     this.languages = langCounts;
     this.channels = out;
     this.byId = new Map(out.map(c => [c.id, c]));
+    this.rematch();
   }
 
   find(id) { return this.byId?.get(id) || null; }
@@ -377,6 +498,12 @@ export class Iptv {
         const ps = list.filter(p => p.endMs > from && p.startMs < until);
         if (ps.length) return ps.map(p => ({ key: `${c.id}@${p.startMs}`, title: p.title, sub: p.sub, desc: p.desc, year: '', startMs: p.startMs, endMs: p.endMs }));
       }
+    }
+    const h = this.guideFor.get(c.id);
+    const list = h && this.guides.get(h.g)?.programmes.get(h.key);
+    if (list?.length) {
+      const ps = list.filter(p => p.endMs > from && p.startMs < until);
+      if (ps.length) return ps.map(p => ({ key: `${c.id}@${p.startMs}`, title: p.title, sub: p.sub, desc: p.desc, year: '', startMs: p.startMs, endMs: p.endMs }));
     }
     // No guide: hour-long "live" blocks so the guide grid still has something to show.
     const out = [];

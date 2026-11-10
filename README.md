@@ -68,6 +68,11 @@ Settings → IPTV:
 
 IPTV channels go on the dial from **500** (changeable), show in the guide with their listings, and play in the app at their own size.
 
+**TV guides** (Settings → IPTV → Free TV guides, on by default): most free channels come from Pluto TV, Samsung TV Plus, Plex or
+the Roku Channel, and those services publish their schedules. OOMPAS Box downloads them about twice a day (a few MB) and matches
+them to your channels by the service's channel id in the stream link, or else by name. 94 of the 100 2000s Cable channels get real
+listings; channels with no schedule show hour-long "Live" blocks. A playlist's own guide (or the guide link you add) always wins.
+
 **OOMPAS Box channels** (Settings → Channels): *Off* (the default), *Guide & Weather* only, or *All*. Spelunkr's channels always stay;
 with OOMPAS Box's channels off they're on their own numbers.
 
@@ -178,6 +183,7 @@ See [`desktop/README.md`](desktop/README.md): `npm install` in `desktop/`, add F
 
 - Spelunkr's channels, schedules and bumpers: [spelunkr.tv](https://spelunkr.tv). Video: the [Internet Archive](https://archive.org).
 - Free IPTV lists: [iptv-org](https://github.com/iptv-org/iptv) (public, free-to-air streams).
+- Free TV guides: [i.mjh.nz](https://github.com/matthuisman/i.mjh.nz) by Matt Huisman (Pluto TV, Samsung TV Plus, Plex and Roku schedules).
 - Display fonts (Shrikhand, Michroma, Zen Dots, Major Mono Display, VT323, Press Start 2P) from Google Fonts, under the SIL Open Font License.
 - Spelunkr's scheduler, as extracted by [spelunkr-guide](https://github.com/buddytohelpu/spelunkr-guide).
   On first run it's downloaded from that project, pinned to a specific commit and verified by SHA-256. It isn't bundled here.

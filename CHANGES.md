@@ -1,3 +1,8 @@
+## OOMPAS Box 1.1.1
+
+- New: **TV guides for IPTV.** Real show listings from the free Pluto TV, Samsung TV Plus, Plex and Roku guides, matched to your
+  channels automatically (94 of the 100 2000s Cable channels). Settings → IPTV → Free TV guides.
+
 ## OOMPAS Box 1.1.0
 
 - New: **2000s Cable**, 100 hand-picked national channels (official free sources only) on 100–199. Settings → IPTV → Free channel lists.

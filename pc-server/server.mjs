@@ -1555,7 +1555,7 @@ const APP_DATA = process.env.APP_DATA || CFG.cacheDir;
 const SETTINGS_FILE = path.join(APP_DATA, 'settings.json');
 const SETTINGS = {
   widescreen: CFG.widescreen, bars: CFG.bars, crt: true, banner: true, volume: 0.8, lastDial: null,
-  iptv: { enabled: false, dialStart: 500, hideAdult: true, hideBroken: false, countries: [], languages: [], categories: [], lists: [] },
+  iptv: { enabled: false, dialStart: 500, hideAdult: true, hideBroken: false, freeGuides: true, countries: [], languages: [], categories: [], lists: [] },
   oompas: 'off',        // OOMPAS Box's own channels: off, guide (Guide & Weather only) or all
   favorites: [],        // starred channel ids: "My channels"
   zoom: 'trim',         // picture shape in the app: fit, trim (zoom past black bars), fill, stretch
@@ -1599,7 +1599,7 @@ function mergeSettings(patch) {
   if (['free', '1', '2', '3', '640x480', '800x600', '960x720', '1024x768', '1280x960'].includes(String(p.windowScale))) SETTINGS.windowScale = String(p.windowScale);
   if (p.iptv && typeof p.iptv === 'object') {
     const i = p.iptv, cur = SETTINGS.iptv;
-    for (const k of ['enabled', 'hideAdult', 'hideBroken']) if (typeof i[k] === 'boolean') cur[k] = i[k];
+    for (const k of ['enabled', 'hideAdult', 'hideBroken', 'freeGuides']) if (typeof i[k] === 'boolean') cur[k] = i[k];
     if (Array.isArray(i.languages)) cur.languages = i.languages.map(x => String(x).slice(0, 60)).filter(Boolean).slice(0, 100);
     if (Array.isArray(i.categories)) cur.categories = i.categories.map(x => String(x).slice(0, 60)).filter(Boolean).slice(0, 200);
     if (Array.isArray(i.countries)) cur.countries = i.countries.map(x => String(x).toLowerCase()).filter(x => /^[a-z?]{1,2}$/.test(x)).slice(0, 250);
@@ -1702,7 +1702,7 @@ async function handleApp(bc, req, res, url) {
   if (!p.startsWith('/api/')) return false;
   if (p === '/api/state') {
     sendJson(res, { name: 'OOMPAS Box', port: CFG.port, settings: SETTINGS,
-                    iptv: bc.iptv?.status() || [], iptvChannels: bc.iptv?.channels.length || 0, iptvCountries: bc.iptv?.countries || {}, iptvCategories: bc.iptv?.categories || {}, iptvLanguages: bc.iptv?.languages || {}, iptvCheck: bc.iptv?.check || null,
+                    iptv: bc.iptv?.status() || [], iptvChannels: bc.iptv?.channels.length || 0, iptvCountries: bc.iptv?.countries || {}, iptvCategories: bc.iptv?.categories || {}, iptvLanguages: bc.iptv?.languages || {}, iptvCheck: bc.iptv?.check || null, iptvGuides: bc.iptv?.guideCount || 0,
                     catalog: CATALOG, watching: [...STREAMS].map(s => ({ addr: s.addr, viewer: s.viewer, dial: s.dial })),
                     x264: !!CFG.x264, oompasReady: !!bc.oompas?.complete });
     return true;

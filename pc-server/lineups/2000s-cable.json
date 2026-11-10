@@ -20,7 +20,8 @@
    "id": "ABCNewsLive1.us@SD",
    "url": "https://abcnews-streams.akamaized.net/hls/live/2023560/abcnewshudson1/master.m3u8",
    "group": "News & Weather",
-   "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/63/ABC_News_Live_logo_2021.svg/960px-ABC_News_Live_logo_2021.svg.png"
+   "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/63/ABC_News_Live_logo_2021.svg/960px-ABC_News_Live_logo_2021.svg.png",
+   "guide": "ABC News Live"
   },
   {
    "dial": 102,
@@ -317,7 +318,8 @@
    "id": "AFV.us@SD",
    "url": "https://linear-12.frequency.stream/dist/plex/12/hls/master/playlist.m3u8",
    "group": "Comedy",
-   "logo": "https://i.imgur.com/TOB9vmW.png"
+   "logo": "https://i.imgur.com/TOB9vmW.png",
+   "guide": "America's Funniest Home Videos"
   },
   {
    "dial": 135,
@@ -767,7 +769,8 @@
    "id": "PowerNationTV.us@SD",
    "url": "https://amg01258-raycomsports-powernationau-samsungau-18bwc.amagi.tv/playlist.m3u8",
    "group": "Home, Food & Outdoors",
-   "logo": "https://i.imgur.com/jguTO8E.png"
+   "logo": "https://i.imgur.com/jguTO8E.png",
+   "guide": "Powernation"
   },
   {
    "dial": 185,
@@ -866,7 +869,8 @@
    "id": "EntertainmentTonight.us@SD",
    "url": "https://enterbcef94b.airspace-cdn.cbsivideo.com/master.m3u8",
    "group": "Entertainment",
-   "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Entertainment_Tonight_2021.svg/960px-Entertainment_Tonight_2021.svg.png"
+   "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Entertainment_Tonight_2021.svg/960px-Entertainment_Tonight_2021.svg.png",
+   "guide": "ET"
   },
   {
    "dial": 196,
@@ -902,7 +906,8 @@
    "id": "JewelryTV.us@SD",
    "url": "https://content.jwplatform.com/live/broadcast/oe7UD7Ag.m3u8",
    "group": "Shopping",
-   "logo": "https://upload.wikimedia.org/wikipedia/en/5/50/Jewelry_television_logo.png"
+   "logo": "https://upload.wikimedia.org/wikipedia/en/5/50/Jewelry_television_logo.png",
+   "guide": "Jewelry Television"
   }
  ]
 }

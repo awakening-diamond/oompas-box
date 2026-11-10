@@ -721,6 +721,7 @@ function pageRows() {
     R.push({ type: 'btn', label: 'Check which channels play', sub: 'Tests every IPTV channel from this PC (takes a minute or two)',
              val: ck?.running ? `Checking ${ck.done}/${ck.total}` : ck?.at ? `${ck.ok} play \u00B7 ${ck.bad} don\u2019t` : '\u25B8', act: startCheck });
     R.push({ type: 'toggle', label: 'Hide channels that don\u2019t play', sub: 'Uses the last check (re-check now and then: streams come and go)', get: () => !!iptvSet().hideBroken, set: v => setIptv({ hideBroken: v }, 'light') });
+    R.push({ type: 'toggle', label: 'Free TV guides', sub: srv.iptvGuides ? `Schedules for ${srv.iptvGuides} channels (Pluto, Samsung, Plex, Roku guides)` : 'Show what\u2019s on, from the free Pluto, Samsung, Plex and Roku guides', get: () => iptvSet().freeGuides !== false, set: v => setIptv({ freeGuides: v }, true) });
     R.push({ type: 'choice', label: 'IPTV starts at channel', values: [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000], get: () => iptvSet().dialStart, set: v => setIptv({ dialStart: v }, 'light') });
     R.push({ type: 'toggle', label: 'Hide adult channels', get: () => iptvSet().hideAdult !== false, set: v => setIptv({ hideAdult: v }, 'light') });
     R.push({ type: 'btn', label: 'Reload playlists', val: '↻', act: reloadIptv });
