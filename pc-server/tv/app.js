@@ -221,7 +221,7 @@ function stopYt() {
 async function playYt(info, seq) {
   const retune = (ms = 600) => setTimeout(() => seq === tuneSeq && tune(S.cur.dial, { quiet: true }), ms);
   if (info.finding) { noSignal(`Finding ${info.finding} on YouTube\u2026`); ytTimer = setTimeout(() => retune(0), 15000); return; }
-  if (info.scan || !info.videoId) scanQueue(info.ytId, info.list, S.cur?.name);
+  if (!info.published && (info.scan || !info.videoId)) scanQueue(info.ytId, info.list, S.cur?.name);
   if (!info.videoId) { noSignal('Getting this channel\u2019s video list from YouTube\u2026 (the first time takes a minute or two)'); ytTimer = setTimeout(() => retune(0), 20000); return; }
   let Y;
   try { Y = await ytApi(); } catch (e) { if (seq === tuneSeq) noSignal(e.message); return; }
@@ -264,7 +264,9 @@ async function playYt(info, seq) {
       onError: () => {
         if (seq !== tuneSeq) return;
         post('/api/youtube/bad', { id: info.ytId, videoId: info.videoId }).catch(() => {});
-        toast('That video won\u2019t play here; skipping it', 2500);
+        // On a shared schedule the slot stays; wait it out instead of trying the same video again.
+        ytEnded = { id: info.videoId, at: Date.now() };
+        toast(info.published ? 'This video won\u2019t play here; back with the next one' : 'That video won\u2019t play here; skipping it', 3000);
         retune(1200);
       },
     },
@@ -350,7 +352,7 @@ async function scanList(job) {
 }
 // Channels that were never scanned, or not for a week, get scanned in the background.
 function scanStale() {
-  for (const c of S.server?.youtube || []) if (c.list && (!c.scannedAt || (c.scanV || 0) < SCAN_V || Date.now() - c.scannedAt > 7 * 86400e3)) scanQueue(c.id, c.list, c.name);
+  for (const c of S.server?.youtube || []) if (c.list && !c.published && (!c.scannedAt || (c.scanV || 0) < SCAN_V || Date.now() - c.scannedAt > 7 * 86400e3)) scanQueue(c.id, c.list, c.name);
 }
 
 function showGate() {
@@ -1068,6 +1070,7 @@ function pageRows() {
     if (!y) { setTimeout(backPage); return R; }
     sec(y.name);
     R.push({ type: 'info', label: 'Link', sub: y.link, val: y.videos ? `${y.videos} videos` : '' });
+    if (y.published) R.push({ type: 'info', label: 'Shared list', sub: 'Everyone with OOMPAS Box gets the same videos at the same times (the list is refreshed daily)', val: '' });
     if (y.builtin) R.push({ type: 'info', label: 'Comes with OOMPAS Box', sub: `Always on channel ${y.dial}, shuffled on its own schedule`, val: '' });
     if (y.bad) R.push({ type: 'info', label: 'Skipped', sub: 'Removed, private, or the uploader doesn\u2019t allow playing outside YouTube', val: `${y.bad} videos` });
     if (!y.builtin) {
@@ -1078,7 +1081,7 @@ function pageRows() {
     R.push({ type: 'input', label: 'Channel number', key: 'dial', ph: String(y.dial) });
     R.push({ type: 'btn', label: 'Save name and number', val: '\u2713', act: () => ytSave({ name: P.data.name, dial: P.data.dial }) });
     }
-    R.push({ type: 'btn', label: 'Read the video list again', sub: 'Picks up new videos (it also does this by itself once a week)', val: SCAN.cur?.list === y.list && y.list ? `Reading ${SCAN.cur.done || 0}/${SCAN.cur.total || '?'}` : '\u21BB', act: () => { scanQueue(y.id, y.list, y.name); renderSettings(); } });
+    if (!y.published) R.push({ type: 'btn', label: 'Read the video list again', sub: 'Picks up new videos (it also does this by itself once a week)', val: SCAN.cur?.list === y.list && y.list ? `Reading ${SCAN.cur.done || 0}/${SCAN.cur.total || '?'}` : '\u21BB', act: () => { scanQueue(y.id, y.list, y.name); renderSettings(); } });
     if (!y.builtin) R.push({ type: 'btn', label: P.confirm === y.id ? 'Press OK again to remove' : 'Remove channel', val: '\u2715', act: async () => {
       if (P.confirm !== y.id) { P.confirm = y.id; return renderSettings(); }
       P.confirm = null; P.data = {};

@@ -1,3 +1,9 @@
+## OOMPAS Box 1.3.5 (engine update)
+
+- Channels 69 and 420 can now follow one **shared video list** published in the repo, so everyone with OOMPAS Box gets the
+  same videos at the same times. A daily GitHub Action makes the list with the YouTube Data API (all uploads, not just the
+  200 the player hands over). Until its API key is set up, each app reads the list itself as before.
+
 ## OOMPAS Box 1.3.4 (engine update)
 
 - Safety net for 1.3.3's list reading in case YouTube's player doesn't say which video it's on.

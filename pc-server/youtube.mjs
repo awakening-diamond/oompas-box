@@ -38,6 +38,10 @@ export function parseYouTubeLink(raw) {
 
 // Channels that come with the app are listed in lineups/youtube.json, which can be updated from
 // GitHub without a new release (see live.mjs).
+// The built-in channels' video lists, published in the repo (lineups/youtube-videos.json, made daily
+// by a GitHub Action from YouTube's API). With it every copy of the app plays the same videos at the
+// same times; without it (not published yet) each app reads the list itself.
+const validPublished = j => j && typeof j.channels === 'object' && Object.values(j.channels).every(c => typeof c.list === 'string' && Array.isArray(c.videos));
 const validBuiltins = j => Array.isArray(j?.channels) && j.channels.every(b => /^[\w-]{2,20}$/.test(b.id) && /^@[\w.-]{2,}$/.test(b.handle) && b.dial >= 1 && b.dial <= 9999);
 
 export class YouTube {
@@ -50,6 +54,7 @@ export class YouTube {
     try { this.channels = JSON.parse(fs.readFileSync(this.file, 'utf8')).channels || []; } catch {}
     this.cache = new Map();   // channel id -> { cycle, order, total }
     this.builtins = liveFileSync('youtube.json', cacheDir, validBuiltins)?.channels || [];
+    this.published = liveFileSync('youtube-videos.json', cacheDir, validPublished)?.channels || {};
     this.ensureBuiltins();
   }
 
@@ -59,6 +64,8 @@ export class YouTube {
   async updateBuiltins(force = false) {
     const j = await liveFile('youtube.json', { cacheDir: this.cacheDir, log: this.log, force, ok: validBuiltins });
     if (j && JSON.stringify(j.channels) !== JSON.stringify(this.builtins)) { this.builtins = j.channels; this.ensureBuiltins(); this.log('YouTube: built-in channels updated'); }
+    const pub = await liveFile('youtube-videos.json', { cacheDir: this.cacheDir, log: this.log, force, maxAge: 3600e3, ok: validPublished });
+    if (pub && JSON.stringify(pub.channels) !== JSON.stringify(this.published)) { this.published = pub.channels; this.ensureBuiltins(); this.log(`YouTube: shared video lists updated (${pub.updated || ''})`); }
     await this.resolveBuiltins();
   }
 
@@ -71,6 +78,11 @@ export class YouTube {
       if ((c.handle && c.handle.toLowerCase() !== b.handle.toLowerCase()) || (c.resolver || 0) < 2)   // another channel now, or looked up the old way
         Object.assign(c, { list: '', videos: [], bad: [], scannedAt: 0, resolver: 2 });
       Object.assign(c, { name: b.name, dial: b.dial, handle: b.handle, link: `https://www.youtube.com/${b.handle}`, order: 'shuffle', builtin: true });
+      const pub = Object.entries(this.published).find(([h]) => h.toLowerCase() === b.handle.toLowerCase())?.[1];
+      if (pub?.videos?.length) {
+        Object.assign(c, { list: pub.list, published: true, bad: [], scannedAt: Date.now(), scanV: 99,
+          videos: pub.videos.filter(v => /^[\w-]{11}$/.test(v.id) && v.dur > 0).map(v => ({ id: v.id, title: String(v.title || '').slice(0, 200), dur: Math.round(v.dur) })) });
+      } else if (c.published) Object.assign(c, { published: false, videos: [], scannedAt: 0, scanV: 0 });
     }
     // Anything the user put on a built-in channel's number moves to the next free one from 300.
     const used = new Set(this.channels.map(c => c.dial));
@@ -161,6 +173,7 @@ export class YouTube {
   setVideos(id, videos, done = true, scanV = 1) {
     const first = this.channels.find(x => x.id === id);
     if (!first) throw Object.assign(new Error('No such YouTube channel'), { status: 404 });
+    if (first.published) return first;
     const clean = (Array.isArray(videos) ? videos : []).slice(0, 5000)
       .filter(v => v && /^[\w-]{11}$/.test(v.id))
       .map(v => ({ id: v.id, title: String(v.title || '').slice(0, 200), dur: Math.max(0, Math.round(+v.dur || 0)), bad: !!v.bad }));
@@ -178,7 +191,7 @@ export class YouTube {
   markBad(id, videoId) {
     const c = this.channels.find(x => x.id === id);
     if (!c || !/^[\w-]{11}$/.test(videoId) || c.bad.includes(videoId)) return;
-    for (const o of this.channels) if ((o === c || (c.list && o.list === c.list)) && !o.bad.includes(videoId)) o.bad.push(videoId);
+    for (const o of this.channels) if (!o.published && (o === c || (c.list && o.list === c.list)) && !o.bad.includes(videoId)) o.bad.push(videoId);
     this.save();
   }
 
@@ -187,7 +200,7 @@ export class YouTube {
     const c = this.channels.find(x => x.id === id);
     if (!c || !(dur > 0)) return;
     let changed = false;
-    for (const o of this.channels) if (o === c || (c.list && o.list === c.list))
+    for (const o of this.channels) if (!o.published && (o === c || (c.list && o.list === c.list)))
       for (const v of o.videos) if (v.id === videoId && Math.abs(v.dur - dur) > 3) { v.dur = Math.round(dur); changed = true; }
     if (changed) { this.save(); this.log(`YouTube: corrected the length of ${videoId}`); }
   }
@@ -249,16 +262,16 @@ export class YouTube {
   playAt(ch, t) {
     const c = this.find(ch.ytId || ch.id);
     if (!c) return null;
-    if (!c.list) { this.resolveBuiltins(); return { ytId: c.id, list: '', finding: c.handle || c.name }; }
+    if (!c.list && !c.published) { this.resolveBuiltins(); return { ytId: c.id, list: '', finding: c.handle || c.name }; }
     const p = this.programs(ch, t, t + 1)[0];
     if (!p || !p.videoId) return { ytId: c.id, list: c.list, scan: !c.scannedAt || Date.now() - c.scannedAt > 7 * 86400e3 };
-    return { ytId: c.id, list: c.list, videoId: p.videoId, start: Math.max(0, (t - p.startMs) / 1000), endMs: p.endMs, dur: (p.endMs - p.startMs) / 1000,
+    return { ytId: c.id, list: c.list, published: !!c.published, videoId: p.videoId, start: Math.max(0, (t - p.startMs) / 1000), endMs: p.endMs, dur: (p.endMs - p.startMs) / 1000,
              title: p.title, scan: Date.now() - c.scannedAt > 7 * 86400e3 };
   }
 
   status() {
     return this.channels.slice().sort((a, b) => a.dial - b.dial).map(c => ({ id: c.id, name: c.name, dial: c.dial, link: c.link, list: c.list, order: c.order, builtin: !!c.builtin,
       videos: this.playable(c).length, bad: c.bad.length, hours: Math.round(this.playable(c).reduce((s, v) => s + v.dur, 0) / 360) / 10,
-      scannedAt: c.scannedAt, scanV: c.scanV || 0 }));
+      scannedAt: c.scannedAt, scanV: c.scanV || 0, published: !!c.published }));
   }
 }

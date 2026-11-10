@@ -1,0 +1,33 @@
+# Refreshes the shared video lists of the built-in YouTube channels (channels 69 and 420) once a day,
+# so every copy of OOMPAS Box plays the same videos at the same times. Needs a YouTube Data API key
+# saved as the repository secret YOUTUBE_API_KEY (Settings > Secrets and variables > Actions).
+name: YouTube lists
+
+on:
+  schedule:
+    - cron: '23 9 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [pc-server/lineups/youtube.json, tools/youtube-lists.mjs]
+
+permissions:
+  contents: write
+
+jobs:
+  lists:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node tools/youtube-lists.mjs
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+      - name: Commit the new lists
+        run: |
+          git add pc-server/lineups/youtube-videos.json 2>/dev/null || exit 0
+          git diff --cached --quiet && exit 0
+          git -c user.name="OOMPAS Box lists" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "Refresh the built-in YouTube channel lists"
+          git push
