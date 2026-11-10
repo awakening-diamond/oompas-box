@@ -41,8 +41,8 @@ export function parseYouTubeLink(raw) {
 
 // Channels that come with the app. Same YouTube channel on two dials, each with its own shuffle.
 export const BUILTIN = [
-  { id: 'hb69', handle: '@HungryBear9562', name: 'HungryBear 69', dial: 69 },
-  { id: 'hb420', handle: '@HungryBear9562', name: 'HungryBear 420', dial: 420 },
+  { id: 'hb69', handle: '@Hungrybear9562', name: 'HungryBear 69', dial: 69 },
+  { id: 'hb420', handle: '@Hungrybear9562', name: 'HungryBear 420', dial: 420 },
 ];
 export const BUILTIN_DIALS = new Set(BUILTIN.map(b => b.dial));
 
@@ -60,8 +60,8 @@ export class YouTube {
   ensureBuiltins() {
     for (const b of BUILTIN) {
       let c = this.channels.find(x => x.id === b.id);
-      if (!c) { c = { id: b.id, list: '', link: `https://www.youtube.com/${b.handle}`, videos: [], bad: [], scannedAt: 0, added: Date.now() }; this.channels.unshift(c); }
-      Object.assign(c, { name: b.name, dial: b.dial, handle: b.handle, order: 'shuffle', builtin: true });
+      if (!c) { c = { id: b.id, list: '', link: '', videos: [], bad: [], scannedAt: 0, added: Date.now() }; this.channels.unshift(c); }
+      Object.assign(c, { name: b.name, dial: b.dial, handle: b.handle, link: `https://www.youtube.com/${b.handle}`, order: 'shuffle', builtin: true });
     }
     // Anything the user put on a built-in channel's number moves to the next free one from 300.
     const used = new Set(this.channels.map(c => c.dial));

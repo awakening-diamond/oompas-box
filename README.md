@@ -48,7 +48,7 @@ The app keeps its data (settings, schedules, your music for the Guide channel) i
 
 ### YouTube channels
 
-**Built in:** channels **69** and **420** are HungryBear9562's videos, shuffled, each on its own schedule. They come with the
+**Built in:** channels **69** and **420** are Hungrybear9562's videos, shuffled, each on its own schedule. They come with the
 app, always sit on those numbers, and can't be removed. The first time you tune in, the app looks the channel up and reads its
 video list (a minute or two).
 

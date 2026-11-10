@@ -1,6 +1,6 @@
 ## OOMPAS Box 1.2.1
 
-- New: **channels 69 and 420**, built in: HungryBear9562's videos, shuffled, each channel on its own schedule.
+- New: **channels 69 and 420**, built in: Hungrybear9562's videos, shuffled, each channel on its own schedule.
 
 ## OOMPAS Box 1.2.0
 
