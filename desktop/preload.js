@@ -7,4 +7,6 @@ contextBridge.exposeInMainWorld('oompasApp', {
   // Size the window's picture area (when it isn't full screen or maximized).
   // Sets the picture area's size once; the window keeps it (and can still be dragged).
   fitWindow: (w, h) => ipcRenderer.send('fit-window', Number(w), Number(h)),
+  // Hide YouTube's own on-screen extras (title bar, logo, end cards, pause/ad overlays) in its player.
+  setYouTubeClean: on => ipcRenderer.send('yt-clean', !!on),
 });

@@ -922,6 +922,8 @@ function pageRows() {
              names: { all: 'All channels', favorites: 'My channels' }, get: () => st.surf || 'all', set: v => { st.surf = v; saveSetting({ surf: v }); } });
     R.push({ type: 'info', label: 'My channels', val: `${(st.favorites || []).length} starred` });
     sec('YouTube');
+    R.push({ type: 'toggle', label: 'Hide YouTube\u2019s on-screen extras', sub: window.oompasApp?.setYouTubeClean ? 'Title bar, YouTube logo, end cards and pop-ups over the picture' : 'Needs the OOMPAS Box app 1.4.0 or newer',
+      get: () => !!st.ytClean, set: v => { st.ytClean = v; window.oompasApp?.setYouTubeClean?.(v); saveSetting({ ytClean: v }); } });
     R.push({ type: 'btn', label: 'Add a YouTube channel\u2026', sub: 'Make a channel from a YouTube playlist or a YouTube channel', val: '+', act: () => { P.data = {}; goPage('ytadd'); } });
     for (const y of srv.youtube || []) {
       const scanning = SCAN.cur?.list === y.list && y.list ? `Reading ${SCAN.cur.done || 0}/${SCAN.cur.total || '?'}` : SCAN.queue.some(q => q.list === y.list) ? 'Waiting' : '';
@@ -1306,6 +1308,7 @@ async function start() {
   if (first) tune(first.dial);
   else noSignal('No channels yet');
   setTimeout(scanStale, 5000);
+  window.oompasApp?.setYouTubeClean?.(!!S.settings?.ytClean);
   applyCaptions();
   setInterval(() => loadChannels().then(() => { if (S.mode === 'guide') renderGuide(); }).catch(() => {}), 60000);
   setInterval(() => { if (S.mode === 'guide') $('.g-clock').textContent = hm(Date.now()); }, 15000);

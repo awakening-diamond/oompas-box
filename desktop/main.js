@@ -251,6 +251,7 @@ function createWindow() {
     icon: path.join(__dirname, 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true, backgroundThrottling: false },
   });
+  win.webContents.on('did-frame-finish-load', (e, isMain) => { if (!isMain && ytClean) styleYouTubeFrames(); });
   win.webContents.on('render-process-gone', (e, d) => log(`Window process stopped: ${d.reason} (${d.exitCode})`));
   win.on('unresponsive', () => log('Window stopped responding'));
   win.on('responsive', () => log('Window responding again'));
@@ -324,6 +325,27 @@ function showLog() {
     f();setInterval(f,2000);</script></body>`;
   w.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
 }
+
+// "Hide YouTube's on-screen extras": a style sheet put into YouTube's player frames.
+let ytClean = false;
+const YT_CLEAN_CSS = [
+  '.ytp-chrome-top', '.ytp-gradient-top', '.ytp-chrome-bottom', '.ytp-gradient-bottom', '.ytp-watermark', '.ytp-youtube-button',
+  '.ytp-title', '.ytp-title-channel', '.ytp-show-cards-title', '.ytp-cards-teaser', '.ytp-cards-button', '.iv-branding',
+  '.ytp-pause-overlay', '.ytp-pause-overlay-container', '.ytp-ce-element', '.ytp-endscreen-content', '.videowall-endscreen',
+  '.ytp-bezel', '.ytp-bezel-text-wrapper', '.ytp-large-play-button', '.ytp-paid-content-overlay', '.ytp-impression-link',
+  '.ytp-embed-overlay', '.ytp-overflow-button', '.ytp-share-button', '.ytp-watch-later-button', '.ytp-contextmenu',
+  '.ytp-ad-overlay-container', '.ytp-ad-text', '.ytp-ad-preview-container', '.ytp-ad-player-overlay', '.ytp-ad-player-overlay-layout',
+  '.ytp-ad-visit-advertiser-button', '.ytp-ad-skip-button-container', '.ytp-ad-message-container', '.ytp-tooltip',
+].join(',') + ' { display: none !important; opacity: 0 !important; }';
+function styleYouTubeFrames() {
+  if (!win || win.isDestroyed()) return;
+  const js = `(() => { let s = document.getElementById('oompas-clean');
+    if (${ytClean}) { if (!s) { s = document.createElement('style'); s.id = 'oompas-clean'; (document.head || document.documentElement).appendChild(s); } s.textContent = ${JSON.stringify(YT_CLEAN_CSS)}; }
+    else if (s) s.remove(); })()`;
+  for (const f of win.webContents.mainFrame.framesInSubtree)
+    if (/^https:\/\/www\.youtube(-nocookie)?\.com\/embed\//.test(f.url)) f.executeJavaScript(js).catch(() => {});
+}
+ipcMain.on('yt-clean', (e, on) => { ytClean = !!on; styleYouTubeFrames(); });
 
 ipcMain.on('fullscreen', () => { if (win) win.setFullScreen(!win.isFullScreen()); });
 

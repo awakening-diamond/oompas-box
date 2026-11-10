@@ -1,3 +1,9 @@
+## OOMPAS Box 1.4.0
+
+- New setting: Settings → YouTube → **Hide YouTube's on-screen extras**: hides the title bar, YouTube logo, end-screen
+  cards, pause and ad pop-ups inside YouTube's player, for a cleaner TV picture. Off unless you turn it on. (YouTube's rules
+  for apps don't allow changing its player, so this is meant for personal use.)
+
 ## OOMPAS Box 1.3.6 (engine update)
 
 - Channels 69 and 420 show the **Double Rainbow TV** logo in the bottom-right corner, see-through like a TV station's.
