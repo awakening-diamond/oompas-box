@@ -1,12 +1,37 @@
 {
  "name": "Built-in YouTube channel videos",
- "updated": "2026-11-17T18:39:07.621Z",
+ "updated": "2026-11-19T18:22:19.116Z",
  "source": "YouTube Data API",
  "channels": {
   "@Hungrybear9562": {
    "list": "UUTyFi_QGObn2xEzasG_zR8Q",
    "title": "Yosemitebear62",
    "videos": [
+    {
+     "id": "Zot34kYMhrg",
+     "title": "Half Dome Doobie 11 16",
+     "dur": 18
+    },
+    {
+     "id": "hZSpJphnmUk",
+     "title": "Yosemite Indian Big Foot Song 11 16",
+     "dur": 22
+    },
+    {
+     "id": "pPbWWa6wPf8",
+     "title": "I'm Done Yosemite Vlog 11 18 16",
+     "dur": 567
+    },
+    {
+     "id": "orbkrIHwty0",
+     "title": "Yosemite Handicap Pass 11 16",
+     "dur": 24
+    },
+    {
+     "id": "8gDhZJFa72U",
+     "title": "Tired of this Body 11 16",
+     "dur": 94
+    },
     {
      "id": "f8-lMgT7CT0",
      "title": "Austrian Traveler",
