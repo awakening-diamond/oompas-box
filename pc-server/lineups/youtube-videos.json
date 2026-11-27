@@ -1,12 +1,22 @@
 {
  "name": "Built-in YouTube channel videos",
- "updated": "2026-11-23T21:30:24.693Z",
+ "updated": "2026-11-27T19:03:21.401Z",
  "source": "YouTube Data API",
  "channels": {
   "@Hungrybear9562": {
    "list": "UUTyFi_QGObn2xEzasG_zR8Q",
    "title": "Yosemitebear62",
    "videos": [
+    {
+     "id": "jIsLVrNGcjI",
+     "title": "Yosemite Valley Overlook Tourists 11 18",
+     "dur": 41
+    },
+    {
+     "id": "un5_lqThiA4",
+     "title": "Picking Irene Up 11 16",
+     "dur": 14
+    },
     {
      "id": "nv3o7QiZ1Fk",
      "title": "Sunset Clouds Onetake 11 22 16",
