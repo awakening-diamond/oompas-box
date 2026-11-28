@@ -1,12 +1,32 @@
 {
  "name": "Built-in YouTube channel videos",
- "updated": "2026-11-27T19:03:21.401Z",
+ "updated": "2026-11-28T17:38:24.767Z",
  "source": "YouTube Data API",
  "channels": {
   "@Hungrybear9562": {
    "list": "UUTyFi_QGObn2xEzasG_zR8Q",
    "title": "Yosemitebear62",
    "videos": [
+    {
+     "id": "3xsFAsDaovE",
+     "title": "Belgium Eva Interview 11 27 16",
+     "dur": 720
+    },
+    {
+     "id": "ZWPNO8-y16c",
+     "title": "Front Yard Sunset Sky Clouds 11 16",
+     "dur": 74
+    },
+    {
+     "id": "66BzaH2RQFA",
+     "title": "Yosemite Tunnel View 11 16",
+     "dur": 13
+    },
+    {
+     "id": "cWrSTrkPoio",
+     "title": "Yosemite Falls Winter  11 17",
+     "dur": 34
+    },
     {
      "id": "jIsLVrNGcjI",
      "title": "Yosemite Valley Overlook Tourists 11 18",
